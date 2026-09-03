@@ -23,13 +23,58 @@ PROFILE_B = "Block_B_Schedule"
 ALL_PROFILES = [PROFILE_A, PROFILE_B]
 
 
-def default_flat() -> dict[str, list[str]]:
+VARIANTS = ["Everyday", "A", "B"]
+
+
+def default_block_variants() -> dict[str, list[str]]:
+    return {v: [] for v in VARIANTS}
+
+
+def default_flat() -> dict[str, dict[str, list[str]]]:
     return {}
 
 
 def default_rosters() -> dict[str, dict[str, list[str]]]:
     flat = default_flat()
     return {PROFILE_A: dict(flat), PROFILE_B: dict(flat)}
+
+
+def _is_structured(data: dict[str, Any]) -> bool:
+    if not data:
+        return False
+    for v in data.values():
+        if isinstance(v, dict) and any(k in VARIANTS for k in v.keys()):
+            return True
+        if isinstance(v, dict) and any(isinstance(x, list) for x in v.values()):
+            # Could be variant dict
+            if set(v.keys()).issubset(set(VARIANTS)):
+                return True
+    return False
+
+
+def _migrate_flat_to_structured(flat: dict[str, list[str]]) -> dict[str, dict[str, list[str]]]:
+    out: dict[str, dict[str, list[str]]] = {}
+    for block, names in flat.items():
+        cleaned = [str(x).strip() for x in names if str(x).strip()]
+        out[str(block).strip()] = {"Everyday": cleaned, "A": [], "B": []}
+    return out
+
+
+def _migrate_structured_to_flat_for_compat(s: dict[str, dict[str, list[str]]]) -> dict[str, list[str]]:
+    # For old readers that expect flat list: use Everyday if present else first variant
+    out: dict[str, list[str]] = {}
+    for block, variants in s.items():
+        if "Everyday" in variants and variants["Everyday"]:
+            out[block] = list(variants["Everyday"])
+        else:
+            # union of variants
+            seen: dict[str, str] = {}
+            for v in VARIANTS:
+                for n in variants.get(v, []):
+                    if n.strip() and n.strip() not in seen:
+                        seen[n.strip()] = n.strip()
+            out[block] = list(seen.values())
+    return out
 
 
 def _is_nested(data: dict[str, Any]) -> bool:
@@ -114,7 +159,12 @@ def _is_test_data(data: dict[str, Any]) -> bool:
 
 
 def load_rosters_flat() -> dict[str, list[str]]:
-    """Load new flat per-block rosters. Auto-migrates legacy nested."""
+    """Legacy compat: returns union flat per-block (Everyday+A+B). Prefer load_rosters_structured."""
+    s = load_rosters_structured()
+    return _migrate_structured_to_flat_for_compat(s)
+
+
+def load_rosters_structured() -> dict[str, dict[str, list[str]]]:
     p = rosters_path()
     if not p.exists():
         return default_flat()
@@ -124,15 +174,26 @@ def load_rosters_flat() -> dict[str, list[str]]:
             return default_flat()
         if _is_test_data(data):
             return {}
+        if _is_structured(data):
+            out: dict[str, dict[str, list[str]]] = {}
+            for block, variants in data.items():
+                if not isinstance(variants, dict):
+                    continue
+                cleaned_v: dict[str, list[str]] = {}
+                for v in VARIANTS:
+                    lst = variants.get(v, [])
+                    if isinstance(lst, list):
+                        cleaned_v[v] = [str(x).strip() for x in lst if str(x).strip()]
+                    else:
+                        cleaned_v[v] = []
+                out[str(block).strip()] = cleaned_v
+            return out
         if _is_new_flat(data):
-            # Could be new flat or legacy flat (same shape) — normalize
-            # If keys look like Block_A_Schedule with list values, that's actually legacy flat with profile keys? but legacy flat stored as {Block_1:[...]} not profile
-            # Distinguish: new flat keys are block names like "Block 1" or custom; legacy flat was also Block_1. So same. Treat as flat.
-            # If file has exactly 2 keys Block_A_Schedule/Profile_B as lists — improbable. Keep as flat.
-            return {str(k): [str(x).strip() for x in v if str(x).strip()] for k, v in data.items() if isinstance(v, list)}
+            flat = {str(k): [str(x).strip() for x in v if str(x).strip()] for k, v in data.items() if isinstance(v, list)}
+            return _migrate_flat_to_structured(flat)
         if _is_nested(data):
-            return _migrate_nested_to_flat(data)  # type: ignore
-        # Unknown shape
+            flat = _migrate_nested_to_flat(data)  # type: ignore
+            return _migrate_flat_to_structured(flat)
         return default_flat()
     except Exception:
         return default_flat()
@@ -176,122 +237,150 @@ def load_rosters() -> dict[str, list[str]]:
 
 
 def get_roster(profile: str, block_id: str) -> list[str]:
-    # Legacy signature: profile-aware. Map to new flat by block_id.
-    # If profile is Block_A/B, we try to return that block's roster if exists else flat.
-    flat = load_rosters_flat()
-    # If block_id exists in flat, return it (single roster per block)
-    if block_id in flat:
-        return list(flat[block_id])
-    # Fallback: try nested load for legacy files that haven't migrated yet
-    nested = load_rosters_nested()
-    return list(nested.get(profile, {}).get(block_id, []))
+    s = load_rosters_structured()
+    variants = s.get(block_id, {})
+    # Map legacy profile to variant letter
+    letter = "Everyday"
+    if "B" in profile:
+        letter = "B"
+    elif "A" in profile:
+        letter = "A"
+    if letter in variants and variants[letter]:
+        return list(variants[letter])
+    return list(variants.get("Everyday", []))
 
 
 def get_roster_for_block(block_name: str) -> list[str]:
-    flat = load_rosters_flat()
-    return list(flat.get(block_name, []))
+    return get_roster_for_block_variant(block_name, "Everyday")
 
 
 def save_rosters(data: dict[str, Any]) -> None:
     p = rosters_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    # If data is flat new style (all lists)
-    if data and all(isinstance(v, list) for v in data.values()):
-        # Save as new flat (per-block)
-        cleaned: dict[str, list[str]] = {str(k).strip(): [str(x).strip() for x in v if str(x).strip()] for k, v in data.items() if str(k).strip()}
+    if data and _is_structured(data):
+        cleaned: dict[str, dict[str, list[str]]] = {}
+        for block, variants in data.items():
+            if not isinstance(variants, dict):
+                continue
+            cv: dict[str, list[str]] = {}
+            for v in VARIANTS:
+                lst = variants.get(v, [])
+                if isinstance(lst, list):
+                    cv[v] = [str(x).strip() for x in lst if str(x).strip()]
+                else:
+                    cv[v] = []
+            cleaned[str(block).strip()] = cv
+        # remove empty blocks with no names at all?
         p.write_text(json.dumps(cleaned, indent=2), encoding="utf-8")
         try: import os; os.chmod(p, 0o666)
         except Exception: pass
         return
-    if data and _is_nested(data):
-        # Legacy nested: migrate to flat on save for new model
-        flat = _migrate_nested_to_flat(data)  # type: ignore
-        p.write_text(json.dumps(flat, indent=2), encoding="utf-8")
-        try: import os; os.chmod(p, 0o666)
-        except Exception: pass
+    if data and all(isinstance(v, list) for v in data.values()):
+        structured = _migrate_flat_to_structured({str(k): list(v) for k, v in data.items()})
+        save_rosters(structured)
         return
-    # Fallback
+    if data and _is_nested(data):
+        flat = _migrate_nested_to_flat(data)  # type: ignore
+        structured = _migrate_flat_to_structured(flat)
+        save_rosters(structured)
+        return
     p.write_text(json.dumps(data, indent=2), encoding="utf-8")
     try: import os; os.chmod(p, 0o666)
     except Exception: pass
 
 
-def save_nested(data: dict[str, dict[str, list[str]]]) -> None:
-    # Now saves as new flat (union) to move forward
-    flat = _migrate_nested_to_flat(data)
-    save_rosters(flat)
-
-
-def save_flat(data: dict[str, list[str]]) -> None:
+def save_structured(data: dict[str, dict[str, list[str]]]) -> None:
     save_rosters(data)
 
 
+def save_nested(data: dict[str, dict[str, list[str]]]) -> None:
+    flat = _migrate_nested_to_flat(data)
+    structured = _migrate_flat_to_structured(flat)
+    save_rosters(structured)
+
+
+def save_flat(data: dict[str, list[str]]) -> None:
+    structured = _migrate_flat_to_structured(data)
+    save_rosters(structured)
+
+
+def get_roster_for_block_variant(block_name: str, variant: str = "Everyday") -> list[str]:
+    s = load_rosters_structured()
+    variants = s.get(block_name, {})
+    if variant in variants and variants[variant]:
+        return list(variants[variant])
+    if "Everyday" in variants:
+        return list(variants.get("Everyday", []))
+    return []
+
+
+def set_roster_for_block_variant(block_name: str, variant: str, names: list[str]) -> None:
+    s = load_rosters_structured()
+    if block_name not in s:
+        s[block_name] = default_block_variants()
+    if variant not in VARIANTS:
+        variant = "Everyday"
+    s[block_name][variant] = [str(x).strip() for x in names if str(x).strip()]
+    save_rosters(s)
+
+
 def set_roster_block(block_id: str, names: list[str]) -> None:
-    flat = load_rosters_flat()
-    flat[block_id] = names
-    save_flat(flat)
+    set_roster_for_block_variant(block_id, "Everyday", names)
 
 
 def set_roster_for(profile: str, block_id: str, names: list[str]) -> None:
-    # Legacy: profile-specific set. New model ignores profile and sets per-block,
-    # but we preserve union behavior: set that block's roster for all profiles (single flat).
-    # To avoid data loss, just set per-block.
-    flat = load_rosters_flat()
-    flat[block_id] = names
-    save_flat(flat)
+    set_roster_for_block_variant(block_id, "Everyday", names)
 
 
 def set_roster_for_block(block_name: str, names: list[str]) -> None:
-    flat = load_rosters_flat()
-    flat[block_name] = names
-    save_flat(flat)
+    set_roster_for_block_variant(block_name, "Everyday", names)
 
 
 def rename_block_roster(old_name: str, new_name: str) -> None:
     if old_name == new_name:
         return
-    flat = load_rosters_flat()
-    if old_name in flat:
-        flat[new_name] = flat.pop(old_name)
-        # If new_name already had roster, merge union
-        # Already handled by pop+assign; if both existed, we merged pop then overwrite — merge instead
-    # If both existed before rename (user renamed to existing name), merge
-    # Actually above pop loses new_name's old roster if it existed; handle properly
-    # Reload to handle correctly
-    # Simpler: re-read raw
-    p = rosters_path()
-    try:
-        data = json.loads(p.read_text(encoding="utf-8"))
-        # This path handled after, but just ensure
-    except Exception:
-        pass
-    # If both old and new existed in original flat, union them
-    # We have stored flat before rename, check if new_name already existed before
-    # For now, if flat had both, union after
-    # Implement union if needed
-    orig_flat = load_rosters_flat()  # after pop, new flat is already after; need before
-    # To avoid complexity, just ensure rename preserves: handled above is fine.
-    save_flat(flat)
+    s = load_rosters_structured()
+    if old_name in s:
+        if new_name in s:
+            # merge variants union
+            for v in VARIANTS:
+                seen = set(s[new_name].get(v, []))
+                for n in s[old_name].get(v, []):
+                    if n not in seen:
+                        s[new_name][v].append(n)
+            del s[old_name]
+        else:
+            s[new_name] = s.pop(old_name)
+        save_rosters(s)
 
 
 def delete_block_roster(block_name: str) -> None:
-    flat = load_rosters_flat()
-    if block_name in flat:
-        del flat[block_name]
-        save_flat(flat)
+    s = load_rosters_structured()
+    if block_name in s:
+        del s[block_name]
+        save_rosters(s)
 
 
-def merge_roster_csv(csv_path: Path, target_block: str | None = None, target_profile: str | None = None) -> dict[str, Any]:
-    """Non-destructive merge per block (target_block). Ignores target_profile (kept for compat)."""
-    flat = load_rosters_flat()
+def merge_roster_csv(csv_path: Path, target_block: str | None = None, target_profile: str | None = None, target_variant: str | None = None) -> dict[str, Any]:
+    s = load_rosters_structured()
     block = target_block or "Block 1"
-    flat.setdefault(block, [])
-
+    variant = target_variant or target_profile or "Everyday"
+    if variant not in VARIANTS:
+        # map legacy Block_A_Schedule etc
+        if "B" in str(variant):
+            variant = "B"
+        elif "A" in str(variant):
+            variant = "A"
+        else:
+            variant = "Everyday"
+    if block not in s:
+        s[block] = default_block_variants()
     new_names: list[str] = []
     with csv_path.open(newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         headers = [h.strip().lower() if h else "" for h in (reader.fieldnames or [])]
         has_block = "block id" in headers or "block_id" in headers or "block" in headers
+        has_variant = "variant" in headers or "group" in headers or "day_type" in headers
         for row in reader:
             name = (row.get("Student Name") or row.get("student name") or row.get("Name") or row.get("name") or "").strip()
             if not name:
@@ -300,28 +389,36 @@ def merge_roster_csv(csv_path: Path, target_block: str | None = None, target_pro
                     name = str(row[first_key]).strip()
             if not name:
                 continue
-            # If CSV has block column and no target_block, allow per-row block (but new model expects single target)
             row_block = block
+            row_variant = variant
             if has_block and not target_block:
                 row_block = (row.get("Block ID") or row.get("block id") or row.get("Block") or row.get("block") or block).strip() or block
-                if row_block not in flat:
-                    flat[row_block] = []
-                existing = set(flat[row_block])
+            if has_variant and not target_variant and not target_profile:
+                rv = (row.get("Variant") or row.get("variant") or row.get("Group") or row.get("group") or row.get("Day Type") or "").strip()
+                if rv in VARIANTS:
+                    row_variant = rv
+            if row_block not in s:
+                s[row_block] = default_block_variants()
+            if has_block and not target_block:
+                existing = set(s[row_block].get(row_variant, []))
                 if name not in existing:
-                    flat[row_block].append(name)
+                    s[row_block][row_variant].append(name)
             else:
-                new_names.append(name)
-
+                # collect for batch
+                if has_variant and not target_variant:
+                    # per-row variant handling already? treat individually
+                    existing = set(s[row_block].get(row_variant, []))
+                    if name not in existing:
+                        s[row_block][row_variant].append(name)
+                else:
+                    new_names.append(name)
     if new_names:
-        # Add to target block, dedup
-        existing = set(flat[block])
+        existing = set(s[block].get(variant, []))
         for name in new_names:
             if name not in existing:
-                flat[block].append(name)
+                s[block][variant].append(name)
                 existing.add(name)
-
     if not new_names and has_block is False:
-        # Fallback headerless
         with csv_path.open(newline="", encoding="utf-8-sig") as f:
             reader2 = csv.reader(f)
             rows = list(reader2)
@@ -333,13 +430,13 @@ def merge_roster_csv(csv_path: Path, target_block: str | None = None, target_pro
                     continue
                 name = r[0].strip()
                 row_block = r[1].strip() if len(r) > 1 and r[1].strip() else block
+                row_variant = r[2].strip() if len(r) > 2 and r[2].strip() in VARIANTS else variant
                 if not name:
                     continue
-                if row_block not in flat:
-                    flat[row_block] = []
-                existing = set(flat[row_block])
+                if row_block not in s:
+                    s[row_block] = default_block_variants()
+                existing = set(s[row_block].get(row_variant, []))
                 if name not in existing:
-                    flat[row_block].append(name)
-
-    save_flat(flat)
-    return flat
+                    s[row_block][row_variant].append(name)
+    save_rosters(s)
+    return s

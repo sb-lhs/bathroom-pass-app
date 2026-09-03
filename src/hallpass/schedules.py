@@ -24,7 +24,7 @@ from .config import schedules_path
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
-DAY_TYPES = ["Everyday", "A", "B", "Late Start", "Early Dismissal", "PowerHour"]
+DAY_TYPES = ["Everyday", "A", "B"]
 
 
 @dataclass
@@ -45,12 +45,6 @@ def _norm_day_type(v: Any) -> str:
     if v in DAY_TYPES:
         return v
     low = v.lower()
-    if "late" in low:
-        return "Late Start"
-    if "early" in low:
-        return "Early Dismissal"
-    if "power" in low:
-        return "PowerHour"
     if "block_a" in low or low == "a" or "a day" in low:
         return "A"
     if "block_b" in low or low == "b" or "b day" in low:
@@ -75,60 +69,23 @@ def _norm_time(t: str, fallback: str) -> str:
 
 
 def default_blocks() -> list[dict[str, str]]:
+    """Generic placeholder blocks — user edits names/times; not tied to any school."""
     return [
         {"name": "Block 1", "start": "08:00", "end": "09:20", "day_type": "Everyday"},
-        {"name": "CougarConnect", "start": "09:25", "end": "09:50", "day_type": "Everyday"},
-        {"name": "Block 2", "start": "09:55", "end": "11:15", "day_type": "Everyday"},
-        {"name": "Block 3A", "start": "11:20", "end": "12:40", "day_type": "Everyday"},
-        {"name": "Block 3B", "start": "11:45", "end": "13:05", "day_type": "Everyday"},
-        {"name": "Block 4", "start": "13:10", "end": "14:30", "day_type": "Everyday"},
+        {"name": "Block 2", "start": "09:25", "end": "10:45", "day_type": "Everyday"},
+        {"name": "Block 3", "start": "10:50", "end": "12:10", "day_type": "Everyday"},
+        {"name": "Block 4", "start": "12:15", "end": "13:35", "day_type": "Everyday"},
     ]
 
 
+# Generic template structure — ships with one editable template; users add as many as they need
+# (e.g. "Regular", "Late Start", "Early Release", "A Day", "Blue Day" — any sorting).
 TEMPLATES: dict[str, list[dict[str, str]]] = {
     "Regular": [
         {"name": "Block 1", "start": "08:00", "end": "09:20"},
-        {"name": "CougarConnect", "start": "09:25", "end": "09:50"},
-        {"name": "Block 2", "start": "09:55", "end": "11:15"},
-        {"name": "Block 3A", "start": "11:20", "end": "12:40"},
-        {"name": "Block 3B", "start": "11:45", "end": "13:05"},
-        {"name": "Block 4", "start": "13:10", "end": "14:30"},
-    ],
-    "Regular Wednesday": [
-        {"name": "PowerHour", "start": "07:30", "end": "08:30"},
-        {"name": "Block 1", "start": "09:00", "end": "10:00"},
-        {"name": "CougarConnect", "start": "10:05", "end": "10:50"},
-        {"name": "Block 2", "start": "10:55", "end": "11:55"},
-        {"name": "Block 3A", "start": "12:00", "end": "13:00"},
-        {"name": "Block 3B", "start": "12:25", "end": "13:25"},
-        {"name": "Block 4", "start": "13:30", "end": "14:30"},
-    ],
-    "Late Start": [
-        {"name": "Block 1", "start": "09:50", "end": "10:50"},
-        {"name": "Block 2", "start": "10:55", "end": "11:55"},
-        {"name": "Block 3A", "start": "12:00", "end": "13:00"},
-        {"name": "Block 3B", "start": "12:25", "end": "13:25"},
-        {"name": "Block 4", "start": "13:30", "end": "14:30"},
-    ],
-    "Early Dismissal": [
-        {"name": "Block 1", "start": "08:00", "end": "08:55"},
-        {"name": "Block 2", "start": "09:00", "end": "09:55"},
-        {"name": "Block 3", "start": "10:00", "end": "10:55"},
-        {"name": "Block 4", "start": "11:00", "end": "11:55"},
-    ],
-    "Final Exam": [
-        {"name": "Exam Block", "start": "08:00", "end": "09:30"},
-        {"name": "Break", "start": "09:30", "end": "09:40"},
-        {"name": "Exam Block", "start": "09:45", "end": "11:15"},
-    ],
-    "PowerHour": [
-        {"name": "PowerHour", "start": "07:30", "end": "08:30"},
-        {"name": "Block 1", "start": "09:00", "end": "10:00"},
-        {"name": "CougarConnect", "start": "10:05", "end": "10:50"},
-        {"name": "Block 2", "start": "10:55", "end": "11:55"},
-        {"name": "Block 3A", "start": "12:00", "end": "13:00"},
-        {"name": "Block 3B", "start": "12:25", "end": "13:25"},
-        {"name": "Block 4", "start": "13:30", "end": "14:30"},
+        {"name": "Block 2", "start": "09:25", "end": "10:45"},
+        {"name": "Block 3", "start": "10:50", "end": "12:10"},
+        {"name": "Block 4", "start": "12:15", "end": "13:35"},
     ],
 }
 
@@ -139,19 +96,8 @@ def default_schedules() -> dict[str, Any]:
         "templates": {k: list(v) for k, v in TEMPLATES.items()},
         "date_overrides": {},
         "custom_days": {},
-        "day_defaults": {
-            "Monday": "A",
-            "Tuesday": "A",
-            "Wednesday": "A",
-            "Thursday": "B",
-            "Friday": "B",
-            "Saturday": "A",
-            "Sunday": "A",
-        },
-        "profiles": {
-            "Block_A_Schedule": {"periods": [{"block_id": "Block 1", "start": "08:00", "end": "09:20"}, {"block_id": "Block 2", "start": "09:55", "end": "11:15"}, {"block_id": "Block 3A", "start": "11:20", "end": "12:40"}, {"block_id": "Block 3B", "start": "11:45", "end": "13:05"}, {"block_id": "Block 4", "start": "13:10", "end": "14:30"}]},
-            "Block_B_Schedule": {"periods": [{"block_id": "Block 1", "start": "08:00", "end": "09:20"}, {"block_id": "Block 2", "start": "09:55", "end": "11:15"}, {"block_id": "Block 3A", "start": "11:20", "end": "12:40"}, {"block_id": "Block 3B", "start": "11:45", "end": "13:05"}, {"block_id": "Block 4", "start": "13:10", "end": "14:30"}]},
-        },
+        "day_defaults": {wd: "Everyday" for wd in WEEKDAYS},
+        "profiles": {},
     }
 
 
@@ -185,6 +131,49 @@ def _migrate_legacy_to_blocks(data: dict[str, Any]) -> dict[str, Any]:
     return {"blocks": blocks, "day_defaults": new_dd, "profiles": data.get("profiles", {})}
 
 
+def _norm_template_name(v: Any) -> str:
+    name = str(v or "").strip()
+    return name or "Regular"
+
+
+def _normalize_templates(raw_templates: Any) -> dict[str, list[dict[str, str]]]:
+    if not isinstance(raw_templates, dict) or not raw_templates:
+        return {k: list(v) for k, v in TEMPLATES.items()}
+    out: dict[str, list[dict[str, str]]] = {}
+    for tname, blocks in raw_templates.items():
+        tn = _norm_template_name(tname)
+        if not isinstance(blocks, list):
+            continue
+        nblocks: list[dict[str, str]] = []
+        for b in blocks:
+            if not isinstance(b, dict):
+                continue
+            name = str(b.get("name") or b.get("block_id") or "").strip()
+            if not name:
+                continue
+            nblocks.append({
+                "name": name,
+                "start": _norm_time(str(b.get("start", "08:00")), "08:00"),
+                "end": _norm_time(str(b.get("end", "09:30")), "09:30"),
+            })
+        if nblocks:
+            out[tn] = sorted(nblocks, key=lambda x: x["start"])
+    return out or {k: list(v) for k, v in TEMPLATES.items()}
+
+
+def _normalize_date_map(raw: Any) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, str] = {}
+    for k, v in raw.items():
+        ks = str(k).strip()
+        vs = str(v).strip()
+        if len(ks) == 10 and ks[4] == "-" and ks[7] == "-":
+            # accept YYYY-MM-DD; normalize value as template:letter or letter
+            out[ks] = vs or "Everyday"
+    return out
+
+
 def load_schedules() -> dict[str, Any]:
     p = schedules_path()
     if not p.exists():
@@ -193,9 +182,7 @@ def load_schedules() -> dict[str, Any]:
         raw = json.loads(p.read_text(encoding="utf-8"))
         if not isinstance(raw, dict):
             return default_schedules()
-        # New shape has "blocks" list
         if "blocks" in raw and isinstance(raw["blocks"], list):
-            # Normalize blocks
             nblocks: list[dict[str, str]] = []
             for b in raw["blocks"]:
                 if not isinstance(b, dict):
@@ -211,25 +198,26 @@ def load_schedules() -> dict[str, Any]:
                 })
             if not nblocks:
                 nblocks = default_blocks()
-            # Normalize day_defaults
             dd = raw.get("day_defaults", {})
             if not isinstance(dd, dict):
                 dd = {}
             new_dd: dict[str, str] = {}
             for wd in WEEKDAYS:
-                new_dd[wd] = _norm_day_type(dd.get(wd, "A"))
-            # Preserve profiles for legacy but ensure existence
-            profiles = raw.get("profiles")
-            if not isinstance(profiles, dict):
-                # synthesize from blocks for compat
-                profiles = {
-                    "Block_A_Schedule": {"periods": [{"block_id": b["name"], "start": b["start"], "end": b["end"]} for b in nblocks]},
-                    "Block_B_Schedule": {"periods": [{"block_id": b["name"], "start": b["start"], "end": b["end"]} for b in nblocks]},
-                }
-            return {"blocks": nblocks, "day_defaults": new_dd, "profiles": profiles}
-        # Legacy without blocks
+                new_dd[wd] = _norm_day_type(dd.get(wd, "Everyday"))
+            templates = _normalize_templates(raw.get("templates", {"Regular": nblocks}))
+            date_overrides = _normalize_date_map(raw.get("date_overrides", {}))
+            custom_days = _normalize_date_map(raw.get("custom_days", {}))
+            profiles = raw.get("profiles") if isinstance(raw.get("profiles"), dict) else {}
+            return {"blocks": nblocks, "templates": templates, "date_overrides": date_overrides, "custom_days": custom_days, "day_defaults": new_dd, "profiles": profiles}
         if "profiles" in raw:
-            return _migrate_legacy_to_blocks(raw)
+            migrated = _migrate_legacy_to_blocks(raw)
+            migrated["templates"] = {"Regular": list(migrated["blocks"])}
+            migrated["date_overrides"] = {}
+            migrated["custom_days"] = {}
+            return migrated
+        if "templates" in raw:
+            templates = _normalize_templates(raw.get("templates"))
+            return {"blocks": default_blocks(), "templates": templates, "date_overrides": _normalize_date_map(raw.get("date_overrides")), "custom_days": _normalize_date_map(raw.get("custom_days")), "day_defaults": {wd: "Everyday" for wd in WEEKDAYS}, "profiles": {}}
         return default_schedules()
     except Exception:
         return default_schedules()
@@ -238,12 +226,12 @@ def load_schedules() -> dict[str, Any]:
 def save_schedules(data: dict[str, Any]) -> None:
     p = schedules_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    # Ensure blocks normalized before write
     if "blocks" not in data or not isinstance(data["blocks"], list):
-        # Migrate on save
         data = _migrate_legacy_to_blocks(data)
+        data.setdefault("templates", {"Regular": list(data["blocks"])})
+        data.setdefault("date_overrides", {})
+        data.setdefault("custom_days", {})
     else:
-        # Normalize day_type and times
         nblocks: list[dict[str, str]] = []
         for b in data["blocks"]:
             if not isinstance(b, dict):
@@ -260,19 +248,17 @@ def save_schedules(data: dict[str, Any]) -> None:
         if not nblocks:
             nblocks = default_blocks()
         data["blocks"] = sorted(nblocks, key=lambda x: x["start"])
-        # Normalize day_defaults
         dd = data.get("day_defaults", {})
         if not isinstance(dd, dict):
             dd = {}
         new_dd: dict[str, str] = {}
         for wd in WEEKDAYS:
-            new_dd[wd] = _norm_day_type(dd.get(wd, "A"))
+            new_dd[wd] = _norm_day_type(dd.get(wd, "Everyday"))
         data["day_defaults"] = new_dd
-        # Keep profiles mirror updated for old readers (optional)
-        data["profiles"] = {
-            "Block_A_Schedule": {"periods": [{"block_id": b["name"], "start": b["start"], "end": b["end"]} for b in nblocks if b["day_type"] in ("Everyday", "A")] or [{"block_id": b["name"], "start": b["start"], "end": b["end"]} for b in nblocks]},
-            "Block_B_Schedule": {"periods": [{"block_id": b["name"], "start": b["start"], "end": b["end"]} for b in nblocks if b["day_type"] in ("Everyday", "B")] or [{"block_id": b["name"], "start": b["start"], "end": b["end"]} for b in nblocks]},
-        }
+        data["templates"] = _normalize_templates(data.get("templates", {"Regular": nblocks}))
+        data["date_overrides"] = _normalize_date_map(data.get("date_overrides", {}))
+        data["custom_days"] = _normalize_date_map(data.get("custom_days", {}))
+        data["profiles"] = data.get("profiles", {}) if isinstance(data.get("profiles"), dict) else {}
     p.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
@@ -289,36 +275,62 @@ def set_blocks(blocks: list[dict[str, str]]) -> None:
     save_schedules(data)
 
 
+def _parse_day_value(raw: str) -> tuple[str, str]:
+    s = str(raw or "").strip()
+    if ":" in s:
+        template, letter = s.split(":", 1)
+        return _norm_template_name(template), _norm_day_type(letter)
+    # Could be just letter or just template; try letter first
+    norm_letter = _norm_day_type(s)
+    if norm_letter in ("A", "B", "Everyday"):
+        return "Regular", norm_letter
+    # Otherwise treat as template name with Everyday
+    return _norm_template_name(s), "Everyday"
+
+
+def _resolve_today_entry(data: dict[str, Any], today_key: str) -> tuple[str, str] | None:
+    custom = data.get("custom_days", {})
+    over = data.get("date_overrides", {})
+    if isinstance(custom, dict) and today_key in custom and str(custom[today_key]).strip():
+        return _parse_day_value(str(custom[today_key]))
+    if isinstance(over, dict) and today_key in over and str(over[today_key]).strip():
+        return _parse_day_value(str(over[today_key]))
+    return None
+
+
 def active_block(now: datetime | None = None, override: str | None = None) -> tuple[str, str]:
-    """Return (profile_name, block_id) for current time. Falls back to first block if outside periods.
-    New: respects Everyday/A/B day_type and uses override as A/B letter if provided.
-    Legacy compat: if override is Block_A_Schedule etc, maps to A/B.
-    """
     data = load_schedules()
     if now is None:
         now = datetime.now()
-    weekday = WEEKDAYS[now.weekday()]
-    # Determine today letter A/B
+    today_key = now.strftime("%Y-%m-%d")
     if override and override in ("A", "B", "Everyday"):
         today_letter = override
+        template_name = "Regular"
+    elif override and ":" in override:
+        template_name, today_letter = _parse_day_value(override)
     elif override:
-        today_letter = _norm_day_type(override)
-        if today_letter == "Everyday":
-            today_letter = _norm_day_type(data.get("day_defaults", {}).get(weekday, "A"))
+        template_name, today_letter = _parse_day_value(override)
+        if today_letter == "Everyday" and ":" not in override:
+            resolved = _resolve_today_entry(data, today_key)
+            if resolved:
+                template_name, today_letter = resolved
     else:
-        today_letter = _norm_day_type(data.get("day_defaults", {}).get(weekday, "A"))
+        resolved = _resolve_today_entry(data, today_key)
+        if resolved is None:
+            return "", ""
+        template_name, today_letter = resolved
 
-    blocks = data.get("blocks", [])
+    templates = data.get("templates", {})
+    blocks: list[dict[str, str]] = []
+    if isinstance(templates, dict) and template_name in templates:
+        blocks = templates[template_name]
+    else:
+        blocks = data.get("blocks", [])
     t = now.strftime("%H:%M")
-    # Only return a block whose time and day_type match current time
     for b in sorted(blocks, key=lambda x: x.get("start", "")):
-        dt = b.get("day_type", "Everyday")
-        if dt != "Everyday" and dt != today_letter:
-            continue
         if b.get("start", "") <= t <= b.get("end", ""):
             prof = "Block_A_Schedule" if today_letter == "A" else "Block_B_Schedule" if today_letter == "B" else "Block_A_Schedule"
             return prof, b["name"]
-    # No matching block — return empty so roster is empty
     return "", ""
 
 
@@ -326,11 +338,111 @@ def resolve_today_letter(now: datetime | None = None, override: str | None = Non
     data = load_schedules()
     if now is None:
         now = datetime.now()
-    weekday = WEEKDAYS[now.weekday()]
-    if override and override in ("A", "B"):
+    today_key = now.strftime("%Y-%m-%d")
+    if override and override in ("A", "B", "Everyday"):
         return override
     if override:
-        norm = _norm_day_type(override)
-        if norm in ("A", "B"):
-            return norm
-    return _norm_day_type(data.get("day_defaults", {}).get(weekday, "A"))
+        _, letter = _parse_day_value(override)
+        if letter in ("A", "B", "Everyday"):
+            return letter
+    resolved = _resolve_today_entry(data, today_key)
+    if resolved:
+        _, letter = resolved
+        return letter
+    return "Everyday"
+
+
+def get_templates() -> dict[str, list[dict[str, str]]]:
+    return load_schedules().get("templates", {"Regular": default_blocks()})
+
+
+def set_templates(templates: dict[str, list[dict[str, str]]]) -> None:
+    data = load_schedules()
+    data["templates"] = _normalize_templates(templates)
+    save_schedules(data)
+
+
+def get_date_overrides() -> dict[str, str]:
+    return dict(load_schedules().get("date_overrides", {}))
+
+
+def set_date_overrides(m: dict[str, str]) -> None:
+    data = load_schedules()
+    data["date_overrides"] = _normalize_date_map(m)
+    save_schedules(data)
+
+
+def get_custom_days() -> dict[str, str]:
+    return dict(load_schedules().get("custom_days", {}))
+
+
+def set_custom_day(date_str: str, value: str) -> None:
+    data = load_schedules()
+    custom = _normalize_date_map(data.get("custom_days", {}))
+    if not value.strip():
+        custom.pop(date_str, None)
+    else:
+        custom[date_str] = value.strip()
+    data["custom_days"] = custom
+    save_schedules(data)
+
+
+def import_date_overrides_csv(csv_path: Path, clear_existing: bool = True) -> dict[str, str]:
+    import csv as _csv
+    new_map: dict[str, str] = {} if clear_existing else dict(get_date_overrides())
+    with csv_path.open(newline="", encoding="utf-8-sig") as f:
+        reader = _csv.DictReader(f)
+        headers = [h.strip().lower() if h else "" for h in (reader.fieldnames or [])]
+        has_date = any(h in ("date", "day", "yyyy-mm-dd") for h in headers)
+        if not has_date:
+            f.seek(0)
+            rows = list(_csv.reader(f))
+            for r in rows:
+                if not r or len(r) < 1:
+                    continue
+                d = r[0].strip()
+                if len(d) == 10 and d[4] == "-" and d[7] == "-":
+                    val = r[1].strip() if len(r) > 1 else "Everyday"
+                    new_map[d] = val
+        else:
+            for row in reader:
+                d = (row.get("date") or row.get("Date") or row.get("DATE") or row.get("day") or "").strip()
+                if not d:
+                    d = (row.get("Day") or "").strip()
+                if not d or len(d) != 10:
+                    continue
+                val = (row.get("type") or row.get("Type") or row.get("value") or row.get("template") or row.get("letter") or row.get("day_type") or "").strip() or "Everyday"
+                if len(row) > 2 and not val:
+                    # fallback second column
+                    keys = list(row.keys())
+                    if len(keys) > 1:
+                        val = str(row[keys[1]]).strip() or "Everyday"
+                new_map[d] = val
+    set_date_overrides(new_map)
+    return new_map
+
+
+def import_date_overrides_ics(ics_path: Path, clear_existing: bool = True) -> dict[str, str]:
+    text = ics_path.read_text(encoding="utf-8", errors="ignore")
+    new_map: dict[str, str] = {} if clear_existing else dict(get_date_overrides())
+    # lightweight ICS parse: each VEVENT with DTSTART and SUMMARY
+    dt = ""
+    summary = ""
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("DTSTART"):
+            # DTSTART;VALUE=DATE:20260915 or DTSTART:20260915
+            if ":" in line:
+                raw = line.split(":", 1)[1].strip()[:8]
+                if len(raw) == 8 and raw.isdigit():
+                    dt = f"{raw[0:4]}-{raw[4:6]}-{raw[6:8]}"
+                else:
+                    dt = ""
+        elif line.startswith("SUMMARY"):
+            summary = line.split(":", 1)[1].strip() if ":" in line else ""
+        elif line == "END:VEVENT" and dt:
+            new_map[dt] = summary or "Everyday"
+            dt = ""
+            summary = ""
+    set_date_overrides(new_map)
+    return new_map

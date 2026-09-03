@@ -319,6 +319,49 @@ Dialog {
                     }
                     Rectangle {
                         Layout.fillWidth: true
+                        Layout.preferredHeight: 170
+                        radius: 4
+                        color: backend.simpleMode ? "#eff6ff" : "#ffffff"
+                        border.color: backend.simpleMode ? "#3b82f6" : "#d1d5db"
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 10
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 10
+                                Label { text: "Simple Mode (All Day, All Students)"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 13; Layout.fillWidth: true }
+                                Switch {
+                                    checked: backend.simpleMode
+                                    onToggled: backend.setSimpleMode(checked)
+                                }
+                            }
+                            Label {
+                                text: "When on, the bell schedule and A/B sorting are hidden — one roster shows for the whole day. Works for any school size or sorting."
+                                color: "#475569"
+                                font.pixelSize: 11
+                                wrapMode: Text.WordWrap
+                                Layout.fillWidth: true
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                visible: backend.simpleMode
+                                Label { text: "Simple Roster:"; color: "#1e3a5f"; font.pixelSize: 12 }
+                                TextField {
+                                    id: simpleRosterField
+                                    text: backend.simpleRosterText
+                                    placeholderText: "alice, bob, carol"
+                                    Layout.fillWidth: true
+                                    font.pixelSize: 12
+                                    onEditingFinished: backend.setSimpleRoster(text)
+                                }
+                                Button { text: "Save"; onClicked: backend.setSimpleRoster(simpleRosterField.text); Layout.preferredWidth: 80 }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true
                         Layout.preferredHeight: 210
                         radius: 4
                         color: "#ffffff"
