@@ -32,6 +32,13 @@ cp "$ROOT/hallpass-qt.desktop" "$PKG/usr/share/applications/hallpass-qt.desktop"
 # Sounds
 if ls "$ROOT/sounds"/*.wav 1>/dev/null 2>&1; then cp "$ROOT/sounds"/*.wav "$PKG/usr/share/hallpass/sounds/"; else touch "$PKG/usr/share/hallpass/sounds/classic_chime.wav"; touch "$PKG/usr/share/hallpass/sounds/digital_alarm.wav"; touch "$PKG/usr/share/hallpass/sounds/subtle_bell.wav"; fi
 if ls "$ROOT/sounds"/*.ogg 1>/dev/null 2>&1; then cp "$ROOT/sounds"/*.ogg "$PKG/usr/share/hallpass/sounds/"; fi
+if [ -d "$ROOT/wheelhouse" ] && ls "$ROOT/wheelhouse"/*.whl 1>/dev/null 2>&1; then
+  mkdir -p "$PKG/usr/share/hallpass/wheelhouse"
+  cp "$ROOT/wheelhouse"/*.whl "$PKG/usr/share/hallpass/wheelhouse/"
+  echo "Bundled $(ls "$ROOT/wheelhouse"/*.whl | wc -l) wheel(s) for offline install"
+else
+  echo "No wheelhouse/*.whl found — deb will use online pip fallback (run scripts/fetch_wheels.sh on Debian to bundle offline)"
+fi
 
 # Launcher
 cat > "$PKG/usr/bin/hallpass-qt" <<'EOF'

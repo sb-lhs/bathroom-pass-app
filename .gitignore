@@ -18,6 +18,9 @@ config.json
 hallpass-qt_*.deb
 hallpass-qt_0.1.0_amd64/
 hallpass-qt_1.4.0_amd64/
+hallpass-qt_0.2.*_amd64/
+wheelhouse/*.whl
+!wheelhouse/.gitkeep
 .omo/
 .codegraph/
 .DS_Store

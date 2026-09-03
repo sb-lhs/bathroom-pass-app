@@ -27,9 +27,15 @@ EOF
   fi
   chmod 600 /etc/hallpass/config.json || true
 fi
-if ! python3 -c "import PySide6" 2>/dev/null; then
-  if command -v pip3 >/dev/null 2>&1; then
-    pip3 install --break-system-packages PySide6 opencv-python 2>/dev/null || pip3 install PySide6 opencv-python 2>/dev/null || true
+if ! python3 -c "import PySide6, cv2" 2>/dev/null; then
+  if [ -d /usr/share/hallpass/wheelhouse ] && ls /usr/share/hallpass/wheelhouse/*.whl 1>/dev/null 2>&1; then
+    echo "Installing PySide6/opencv from bundled wheelhouse (offline, ~10s)..."
+    pip3 install --break-system-packages --no-index --find-links=/usr/share/hallpass/wheelhouse PySide6 opencv-python 2>&1 | tail -20 || pip3 install --no-index --find-links=/usr/share/hallpass/wheelhouse PySide6 opencv-python 2>&1 | tail -20 || true
+  elif command -v pip3 >/dev/null 2>&1; then
+    echo "No bundled wheels — falling back to online pip (may be slow on Atom, ~10-20 min)..."
+    pip3 install --break-system-packages PySide6 opencv-python 2>&1 | tail -20 || pip3 install PySide6 opencv-python 2>&1 | tail -20 || true
+  else
+    echo "WARNING: pip3 not found and no bundled wheels — install PySide6 manually"
   fi
 fi
 if [ ! -f /etc/hallpass/schedules.json ]; then
