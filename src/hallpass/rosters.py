@@ -57,9 +57,9 @@ def _migrate_nested_to_flat(nested: dict[str, dict[str, list[str]]]) -> dict[str
         for prof in ALL_PROFILES:
             lst = nested.get(prof, {}).get(block, [])
             for n in lst:
-                low = n.strip().lower()
-                if low and low not in seen:
-                    seen[low] = n.strip()
+                key = n.strip()
+                if key and key not in seen:
+                    seen[key] = key
         # Also check extra profiles (Assembly etc.)
         for prof, prof_data in nested.items():
             if prof in ALL_PROFILES:
@@ -67,9 +67,9 @@ def _migrate_nested_to_flat(nested: dict[str, dict[str, list[str]]]) -> dict[str
             if isinstance(prof_data, dict):
                 lst = prof_data.get(block, [])
                 for n in lst:
-                    low = n.strip().lower()
-                    if low and low not in seen:
-                        seen[low] = n.strip()
+                    key = n.strip()
+                    if key and key not in seen:
+                        seen[key] = key
         flat[block] = list(seen.values())
     # Ensure at least defaults if empty
     if not flat:
@@ -306,19 +306,19 @@ def merge_roster_csv(csv_path: Path, target_block: str | None = None, target_pro
                 row_block = (row.get("Block ID") or row.get("block id") or row.get("Block") or row.get("block") or block).strip() or block
                 if row_block not in flat:
                     flat[row_block] = []
-                existing_lower = {n.lower(): n for n in flat[row_block]}
-                if name.lower() not in existing_lower:
+                existing = set(flat[row_block])
+                if name not in existing:
                     flat[row_block].append(name)
             else:
                 new_names.append(name)
 
     if new_names:
         # Add to target block, dedup
-        existing_lower = {n.lower(): n for n in flat[block]}
+        existing = set(flat[block])
         for name in new_names:
-            if name.lower() not in existing_lower:
+            if name not in existing:
                 flat[block].append(name)
-                existing_lower[name.lower()] = name
+                existing.add(name)
 
     if not new_names and has_block is False:
         # Fallback headerless
@@ -337,8 +337,8 @@ def merge_roster_csv(csv_path: Path, target_block: str | None = None, target_pro
                     continue
                 if row_block not in flat:
                     flat[row_block] = []
-                existing_lower = {n.lower(): n for n in flat[row_block]}
-                if name.lower() not in existing_lower:
+                existing = set(flat[row_block])
+                if name not in existing:
                     flat[row_block].append(name)
 
     save_flat(flat)

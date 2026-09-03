@@ -430,9 +430,9 @@ class Backend(QObject):
             names = [n.strip() for n in csv_text.split(",") if n.strip()]
             seen: dict[str, str] = {}
             for n in names:
-                low = n.lower()
-                if low not in seen:
-                    seen[low] = n
+                key = n.strip()
+                if key and key not in seen:
+                    seen[key] = key
             cleaned = list(seen.values())
             set_roster_for_block(block_name, cleaned)
             self._update_roster_cache()
