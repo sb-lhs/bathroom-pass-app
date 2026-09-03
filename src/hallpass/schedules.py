@@ -76,17 +76,69 @@ def _norm_time(t: str, fallback: str) -> str:
 
 def default_blocks() -> list[dict[str, str]]:
     return [
-        {"name": "Block 1", "start": "08:00", "end": "09:30", "day_type": "Everyday"},
-        {"name": "Block 2", "start": "09:35", "end": "11:05", "day_type": "Everyday"},
-        {"name": "Block 3", "start": "11:10", "end": "12:40", "day_type": "Everyday"},
-        {"name": "Block 4", "start": "13:10", "end": "14:40", "day_type": "Everyday"},
+        {"name": "Block 1", "start": "08:00", "end": "09:20", "day_type": "Everyday"},
+        {"name": "CougarConnect", "start": "09:25", "end": "09:50", "day_type": "Everyday"},
+        {"name": "Block 2", "start": "09:55", "end": "11:15", "day_type": "Everyday"},
+        {"name": "Block 3A", "start": "11:20", "end": "12:40", "day_type": "Everyday"},
+        {"name": "Block 3B", "start": "11:45", "end": "13:05", "day_type": "Everyday"},
+        {"name": "Block 4", "start": "13:10", "end": "14:30", "day_type": "Everyday"},
     ]
 
 
+TEMPLATES: dict[str, list[dict[str, str]]] = {
+    "Regular": [
+        {"name": "Block 1", "start": "08:00", "end": "09:20"},
+        {"name": "CougarConnect", "start": "09:25", "end": "09:50"},
+        {"name": "Block 2", "start": "09:55", "end": "11:15"},
+        {"name": "Block 3A", "start": "11:20", "end": "12:40"},
+        {"name": "Block 3B", "start": "11:45", "end": "13:05"},
+        {"name": "Block 4", "start": "13:10", "end": "14:30"},
+    ],
+    "Regular Wednesday": [
+        {"name": "PowerHour", "start": "07:30", "end": "08:30"},
+        {"name": "Block 1", "start": "09:00", "end": "10:00"},
+        {"name": "CougarConnect", "start": "10:05", "end": "10:50"},
+        {"name": "Block 2", "start": "10:55", "end": "11:55"},
+        {"name": "Block 3A", "start": "12:00", "end": "13:00"},
+        {"name": "Block 3B", "start": "12:25", "end": "13:25"},
+        {"name": "Block 4", "start": "13:30", "end": "14:30"},
+    ],
+    "Late Start": [
+        {"name": "Block 1", "start": "09:50", "end": "10:50"},
+        {"name": "Block 2", "start": "10:55", "end": "11:55"},
+        {"name": "Block 3A", "start": "12:00", "end": "13:00"},
+        {"name": "Block 3B", "start": "12:25", "end": "13:25"},
+        {"name": "Block 4", "start": "13:30", "end": "14:30"},
+    ],
+    "Early Dismissal": [
+        {"name": "Block 1", "start": "08:00", "end": "08:55"},
+        {"name": "Block 2", "start": "09:00", "end": "09:55"},
+        {"name": "Block 3", "start": "10:00", "end": "10:55"},
+        {"name": "Block 4", "start": "11:00", "end": "11:55"},
+    ],
+    "Final Exam": [
+        {"name": "Exam Block", "start": "08:00", "end": "09:30"},
+        {"name": "Break", "start": "09:30", "end": "09:40"},
+        {"name": "Exam Block", "start": "09:45", "end": "11:15"},
+    ],
+    "PowerHour": [
+        {"name": "PowerHour", "start": "07:30", "end": "08:30"},
+        {"name": "Block 1", "start": "09:00", "end": "10:00"},
+        {"name": "CougarConnect", "start": "10:05", "end": "10:50"},
+        {"name": "Block 2", "start": "10:55", "end": "11:55"},
+        {"name": "Block 3A", "start": "12:00", "end": "13:00"},
+        {"name": "Block 3B", "start": "12:25", "end": "13:25"},
+        {"name": "Block 4", "start": "13:30", "end": "14:30"},
+    ],
+}
+
+
 def default_schedules() -> dict[str, Any]:
-    # New default uses blocks list; also keep legacy profiles for migrators that still expect them
     return {
         "blocks": default_blocks(),
+        "templates": {k: list(v) for k, v in TEMPLATES.items()},
+        "date_overrides": {},
+        "custom_days": {},
         "day_defaults": {
             "Monday": "A",
             "Tuesday": "A",
@@ -96,10 +148,9 @@ def default_schedules() -> dict[str, Any]:
             "Saturday": "A",
             "Sunday": "A",
         },
-        # legacy mirror for old code paths (not used by new logic)
         "profiles": {
-            "Block_A_Schedule": {"periods": [{"block_id": "Block 1", "start": "08:00", "end": "09:30"}, {"block_id": "Block 2", "start": "09:35", "end": "11:05"}, {"block_id": "Block 3", "start": "11:10", "end": "12:40"}, {"block_id": "Block 4", "start": "13:10", "end": "14:40"}]},
-            "Block_B_Schedule": {"periods": [{"block_id": "Block 1", "start": "08:00", "end": "09:30"}, {"block_id": "Block 2", "start": "09:35", "end": "11:05"}, {"block_id": "Block 3", "start": "11:10", "end": "12:40"}, {"block_id": "Block 4", "start": "13:10", "end": "14:40"}]},
+            "Block_A_Schedule": {"periods": [{"block_id": "Block 1", "start": "08:00", "end": "09:20"}, {"block_id": "Block 2", "start": "09:55", "end": "11:15"}, {"block_id": "Block 3A", "start": "11:20", "end": "12:40"}, {"block_id": "Block 3B", "start": "11:45", "end": "13:05"}, {"block_id": "Block 4", "start": "13:10", "end": "14:30"}]},
+            "Block_B_Schedule": {"periods": [{"block_id": "Block 1", "start": "08:00", "end": "09:20"}, {"block_id": "Block 2", "start": "09:55", "end": "11:15"}, {"block_id": "Block 3A", "start": "11:20", "end": "12:40"}, {"block_id": "Block 3B", "start": "11:45", "end": "13:05"}, {"block_id": "Block 4", "start": "13:10", "end": "14:30"}]},
         },
     }
 

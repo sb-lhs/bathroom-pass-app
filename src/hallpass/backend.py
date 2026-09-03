@@ -712,8 +712,9 @@ class Backend(QObject):
 
     @Slot(result=bool)
     def markCameraPickerShown(self) -> bool:
-        try:
-            self.cfg = AppConfig(
+        try:,
+            simple_mode=self.cfg.simple_mode,
+            simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [], self.cfg = AppConfig(
                 bathroom_threshold_seconds=self.cfg.bathroom_threshold_seconds,
                 water_threshold_seconds=self.cfg.water_threshold_seconds,
                 admin_password_hash=self.cfg.admin_password_hash,
@@ -776,8 +777,9 @@ class Backend(QObject):
             self.rosterImportStatusChanged.emit(self._roster_import_status)
 
     @Slot(str)
-    def setAlarmSound(self, name: str) -> None:
-        self.cfg = AppConfig(
+    def setAlarmSound(self, name: str) -> None:,
+            simple_mode=self.cfg.simple_mode,
+            simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [], self.cfg = AppConfig(
             bathroom_threshold_seconds=self.cfg.bathroom_threshold_seconds,
             water_threshold_seconds=self.cfg.water_threshold_seconds,
             admin_password_hash=self.cfg.admin_password_hash,
@@ -786,7 +788,9 @@ class Backend(QObject):
             tts_enabled=self.cfg.tts_enabled,
             active_schedule_profile_override=self.cfg.active_schedule_profile_override,
             selected_camera_index=self.cfg.selected_camera_index,
-            camera_picker_shown=self.cfg.camera_picker_shown,
+            camera_picker_shown=self.cfg.camera_picker_shown,,
+            simple_mode=self.cfg.simple_mode,
+            simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [],
         )
         save_config(self.cfg)
         self.sm.cfg = self.cfg
@@ -819,7 +823,9 @@ class Backend(QObject):
             tts_enabled=enabled,
             active_schedule_profile_override=self.cfg.active_schedule_profile_override,
             selected_camera_index=self.cfg.selected_camera_index,
-            camera_picker_shown=self.cfg.camera_picker_shown,
+            camera_picker_shown=self.cfg.camera_picker_shown,,
+            simple_mode=self.cfg.simple_mode,
+            simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [],
         )
         save_config(self.cfg)
         self.sm.cfg = self.cfg
@@ -841,8 +847,9 @@ class Backend(QObject):
                 camera_picker_shown=self.cfg.camera_picker_shown,
             )
         else:
-            new_val = max(60, self.cfg.water_threshold_seconds + delta)
-            self.cfg = AppConfig(
+            new_val = max(60, self.cfg.water_threshold_seconds + delta),
+            simple_mode=self.cfg.simple_mode,
+            simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [], self.cfg = AppConfig(
                 bathroom_threshold_seconds=self.cfg.bathroom_threshold_seconds,
                 water_threshold_seconds=new_val,
                 admin_password_hash=self.cfg.admin_password_hash,
@@ -883,8 +890,9 @@ class Backend(QObject):
         elif profile in ("Everyday", "A", "B"):
             letter = profile
         else:
-            letter = "A"
-        self.cfg = AppConfig(
+            letter = "A",
+            simple_mode=self.cfg.simple_mode,
+            simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [], self.cfg = AppConfig(
             bathroom_threshold_seconds=self.cfg.bathroom_threshold_seconds,
             water_threshold_seconds=self.cfg.water_threshold_seconds,
             admin_password_hash=self.cfg.admin_password_hash,
@@ -893,7 +901,9 @@ class Backend(QObject):
             tts_enabled=self.cfg.tts_enabled,
             active_schedule_profile_override=letter,
             selected_camera_index=self.cfg.selected_camera_index,
-            camera_picker_shown=self.cfg.camera_picker_shown,
+            camera_picker_shown=self.cfg.camera_picker_shown,,
+            simple_mode=self.cfg.simple_mode,
+            simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [],
         )
         save_config(self.cfg)
         self.sm.cfg = self.cfg
