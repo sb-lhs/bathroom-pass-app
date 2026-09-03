@@ -19,13 +19,18 @@ if [ ! -f /etc/hallpass/config.json ]; then
   "salt": "",
   "bathroom_threshold_seconds": 420,
   "water_threshold_seconds": 180,
-  "selected_alarm_sound": "classic_chime.wav",
+  "selected_alarm_sound": "mixkit-facility-alarm-sound-999.wav",
   "tts_enabled": true,
   "active_schedule_profile_override": null
 }
 EOF
   fi
   chmod 600 /etc/hallpass/config.json || true
+fi
+if ! python3 -c "import PySide6" 2>/dev/null; then
+  if command -v pip3 >/dev/null 2>&1; then
+    pip3 install --break-system-packages PySide6 opencv-python 2>/dev/null || pip3 install PySide6 opencv-python 2>/dev/null || true
+  fi
 fi
 if [ ! -f /etc/hallpass/schedules.json ]; then
   cp /usr/share/hallpass/default_schedules.json /etc/hallpass/schedules.json || true

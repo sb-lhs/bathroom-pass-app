@@ -1,7 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PKG="$ROOT/hallpass-qt_0.1.0_amd64"
+# Read version from pyproject.toml (single source of truth)
+VERSION="$(grep -E '^version = ' "$ROOT/pyproject.toml" | sed -E 's/version = \"([^\"]+)\"/\1/')"
+if [ -z "$VERSION" ]; then VERSION="0.2.0"; fi
+PKG="$ROOT/hallpass-qt_${VERSION}_amd64"
 rm -rf "$PKG"
 mkdir -p "$PKG/DEBIAN"
 mkdir -p "$PKG/usr/bin"
@@ -12,6 +15,10 @@ mkdir -p "$PKG/etc/hallpass"
 mkdir -p "$PKG/var/lib/hallpass/photos"
 
 cp "$ROOT/DEBIAN/control" "$PKG/DEBIAN/control"
+# Ensure Version in control matches pyproject at build time
+if grep -q "^Version:" "$PKG/DEBIAN/control"; then
+  sed -i "s/^Version:.*/Version: $VERSION/" "$PKG/DEBIAN/control"
+fi
 cp "$ROOT/DEBIAN/postinst" "$PKG/DEBIAN/postinst"
 chmod 0755 "$PKG/DEBIAN/postinst"
 
