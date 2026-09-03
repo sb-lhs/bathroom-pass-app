@@ -20,14 +20,14 @@ except Exception:
 class AlarmService:
     def __init__(self, sounds_dir: Path | None = None):
         self.sounds_dir = sounds_dir or Path(__file__).parent / "sounds"
-        # Also check /usr/share/hallpass/sounds for deployed
         self._effect = None
         self._current = ""
+        self._fallback_proc = None
         if HAS_QT:
             try:
                 self._effect = QSoundEffect()
                 self._effect.setLoopCount(QSoundEffect.Infinite)  # type: ignore
-                self._effect.setVolume(0.9)
+                self._effect.setVolume(1.0)
             except Exception:
                 self._effect = None
 
@@ -57,24 +57,69 @@ class AlarmService:
         if path:
             try:
                 self._effect.setSource(QUrl.fromLocalFile(str(path)))  # type: ignore
+                self._effect.setVolume(1.0)
             except Exception:
                 pass
 
-    def test(self) -> None:
-        if self._effect and HAS_QT:
+    def _fallback_play(self, path: Path, loop: bool = False) -> bool:
+        import subprocess, shutil
+        for cmd in [["paplay", str(path)], ["aplay", str(path)], ["ffplay", "-nodisp", "-autoexit", str(path)], ["mpg123", str(path)]]:
+            if shutil.which(cmd[0]):
+                try:
+                    if loop:
+                        self._fallback_proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    else:
+                        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return True
+                except Exception:
+                    continue
+        return False
+
+    def test(self) -> bool:
+        name = self._current or "mixkit-facility-alarm-sound-999.wav"
+        path = self._resolve(name)
+        if not path:
+            path = self._resolve(self._current)
+        tried_qt = False
+        if self._effect and HAS_QT and path and path.exists():
             try:
+                self._effect.setSource(QUrl.fromLocalFile(str(path)))  # type: ignore
+                self._effect.setVolume(1.0)
                 self._effect.setLoopCount(1)
                 self._effect.play()
+                tried_qt = True
                 self._effect.setLoopCount(QSoundEffect.Infinite)  # type: ignore
             except Exception:
-                pass
+                tried_qt = False
+        if tried_qt:
+            try:
+                if self._effect.isPlaying():  # type: ignore
+                    return True
+            except Exception:
+                return True
+        if path and path.exists():
+            if self._fallback_play(path, loop=False):
+                return True
+        return tried_qt
 
     def start(self) -> None:
-        if self._effect and HAS_QT:
+        self.stop()
+        path = self._resolve(self._current) if self._current else None
+        if self._effect and HAS_QT and path and path.exists():
             try:
+                self._effect.setSource(QUrl.fromLocalFile(str(path)))  # type: ignore
+                self._effect.setVolume(1.0)
+                self._effect.setLoopCount(QSoundEffect.Infinite)  # type: ignore
                 self._effect.play()
+                try:
+                    if self._effect.isPlaying():  # type: ignore
+                        return
+                except Exception:
+                    return
             except Exception:
                 pass
+        if path and path.exists():
+            self._fallback_play(path, loop=True)
 
     def stop(self) -> None:
         if self._effect and HAS_QT:
@@ -82,6 +127,12 @@ class AlarmService:
                 self._effect.stop()
             except Exception:
                 pass
+        if self._fallback_proc:
+            try:
+                self._fallback_proc.terminate()
+            except Exception:
+                pass
+            self._fallback_proc = None
 
 
 class TTSService:

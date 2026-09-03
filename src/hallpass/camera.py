@@ -17,8 +17,53 @@ class SilentCamera:
         self._warm = False
         self._cv_cap = None
         self._camera_index = camera_index  # 0 front (student-facing), 1 rear
+        self._available_indices: list[int] | None = None
         if warm:
             self.warm()
+
+    def available_indices(self, max_probe: int = 4) -> list[int]:
+        if self._available_indices is not None:
+            return self._available_indices
+        found: list[int] = []
+        try:
+            import cv2  # type: ignore
+            for idx in range(max_probe):
+                cap = None
+                if sys.platform.startswith("linux"):
+                    cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
+                elif sys.platform == "darwin" and hasattr(cv2, "CAP_AVFOUNDATION"):
+                    cap = cv2.VideoCapture(idx, cv2.CAP_AVFOUNDATION)
+                else:
+                    cap = cv2.VideoCapture(idx)
+                if cap and cap.isOpened():
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    ret, frame = cap.read()
+                    if ret and frame is not None:
+                        found.append(idx)
+                    cap.release()
+                elif cap:
+                    cap.release()
+        except Exception:
+            pass
+        if not found:
+            found = [self._camera_index]
+        self._available_indices = found
+        return found
+
+    def capture_all(self, suffix: str = "out", student: str = "", block: str = "") -> list[str]:
+        paths: list[str] = []
+        for idx in self.available_indices():
+            cam_suffix = f"{suffix}_cam{idx}" if len(self.available_indices()) > 1 else suffix
+            orig_idx = self._camera_index
+            self._camera_index = idx
+            p = self.capture(cam_suffix, student, block)
+            self._camera_index = orig_idx
+            if p and not p.endswith("_placeholder"):
+                paths.append(p)
+            elif p:
+                paths.append(p)
+        return paths
 
     def warm(self) -> None:
         """Keep stream open in background as tip recommends — no per-shot init lag."""

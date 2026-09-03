@@ -29,15 +29,7 @@ def default_flat() -> dict[str, list[str]]:
 
 def default_rosters() -> dict[str, dict[str, list[str]]]:
     flat = default_flat()
-    return {
-        PROFILE_A: dict(flat),
-        PROFILE_B: {
-            "Block 1": ["Alex Johnson", "Jamie Fox", "Avery Cole"],
-            "Block 2": ["Blake Ray", "Casey Kim"],
-            "Block 3": ["Morgan Park", "Skyler Day"],
-            "Block 4": ["Riley Quinn", "Quinn Lee"],
-        },
-    }
+    return {PROFILE_A: dict(flat), PROFILE_B: dict(flat)}
 
 
 def _is_nested(data: dict[str, Any]) -> bool:
@@ -96,6 +88,31 @@ def _is_new_flat(data: dict[str, Any]) -> bool:
     return False
 
 
+_TEST_ROSTER_SIGNATURE = {
+    "alex johnson", "sam rivera", "jordan lee", "taylor swift", "casey kim",
+    "morgan park", "riley quinn", "jamie fox", "avery cole", "blake ray", "skyler day", "quinn lee",
+}
+
+
+def _is_test_data(data: dict[str, Any]) -> bool:
+    try:
+        vals: list[str] = []
+        for v in data.values():
+            if isinstance(v, list):
+                vals.extend([str(x).strip().lower() for x in v])
+            elif isinstance(v, dict):
+                for lst in v.values():
+                    if isinstance(lst, list):
+                        vals.extend([str(x).strip().lower() for x in lst])
+        if not vals:
+            return False
+        # If every name in file is from the test set and at least 3 test names present, treat as test data
+        test_hits = sum(1 for n in vals if n in _TEST_ROSTER_SIGNATURE)
+        return test_hits >= 3 and test_hits == len([n for n in vals if n])
+    except Exception:
+        return False
+
+
 def load_rosters_flat() -> dict[str, list[str]]:
     """Load new flat per-block rosters. Auto-migrates legacy nested."""
     p = rosters_path()
@@ -105,6 +122,8 @@ def load_rosters_flat() -> dict[str, list[str]]:
         data = json.loads(p.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return default_flat()
+        if _is_test_data(data):
+            return {}
         if _is_new_flat(data):
             # Could be new flat or legacy flat (same shape) — normalize
             # If keys look like Block_A_Schedule with list values, that's actually legacy flat with profile keys? but legacy flat stored as {Block_1:[...]} not profile

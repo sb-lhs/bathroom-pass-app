@@ -46,6 +46,7 @@ class Backend(QObject):
     historyChanged = Signal()
     photosChanged = Signal()
     passwordStatusChanged = Signal(str)
+    alarmTestStatusChanged = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -78,6 +79,7 @@ class Backend(QObject):
         self._roster_import_status = ""
         self._photos_status = ""
         self._password_status = ""
+        self._alarm_test_status = ""
         # Auto-purge photos older than 7 days on startup
         try:
             self._purge_old_photos_internal(days=7)
@@ -379,6 +381,17 @@ class Backend(QObject):
     def passwordStatus(self) -> str:
         return getattr(self, "_password_status", "")
 
+    @Property(list, notify=photosChanged)  # type: ignore
+    def availableCameras(self) -> list[int]:
+        try:
+            return self.camera.available_indices()
+        except Exception:
+            return [0]
+
+    @Property(str, notify=alarmTestStatusChanged)  # type: ignore
+    def alarmTestStatus(self) -> str:
+        return getattr(self, "_alarm_test_status", "")
+
     @Property(bool, notify=configChanged)  # type: ignore
     def isFirstRun(self) -> bool:
         try:
@@ -563,20 +576,24 @@ class Backend(QObject):
         self._resolve_block()
         self._update_roster_cache()
         pt = PassType.Water if pass_type == "Water" else PassType.Bathroom
-        photo = self.camera.capture("out", student=name, block=self._block_id or "NoBlock")
+        photos = self.camera.capture_all("out", student=name, block=self._block_id or "NoBlock")
+        photo = photos[0] if photos else ""
         ok = self.sm.select_student(name, pt, photo)
         if ok:
             self._elapsed = 0
             self.stateChanged.emit(self.sm.state.value)
             self.elapsedChanged.emit(self._elapsed)
             self.queueChanged.emit()
+            if len(photos) > 1:
+                self.photosChanged.emit()
 
     @Slot(str, str)
     def enqueue(self, name: str, pass_type: str) -> None:
         self._resolve_block()
         self._update_roster_cache()
         pt = PassType.Water if pass_type == "Water" else PassType.Bathroom
-        photo = self.camera.capture("out", student=name, block=self._block_id or "NoBlock")
+        photos = self.camera.capture_all("out", student=name, block=self._block_id or "NoBlock")
+        photo = photos[0] if photos else ""
         if self.sm.enqueue(name, pt, photo):
             self.queueChanged.emit()
             self.photosChanged.emit()
@@ -587,13 +604,16 @@ class Backend(QObject):
         active_name = self.sm.active.student_name if self.sm.active else ""
         active_block = self.sm.active.block_id if self.sm.active else self._block_id
         # Don't re-resolve here — use the block the pass was started in
-        photo_in = self.camera.capture("in", student=active_name, block=active_block or "NoBlock")
+        photos_in = self.camera.capture_all("in", student=active_name, block=active_block or "NoBlock")
+        photo_in = photos_in[0] if photos_in else ""
         rec = self.sm.return_pass(photo_in)
         self._elapsed = 0
         self.stateChanged.emit(self.sm.state.value)
         self.elapsedChanged.emit(self._elapsed)
         self.queueChanged.emit()
         self.historyChanged.emit()
+        if len(photos_in) > 1:
+            self.photosChanged.emit()
 
     @Slot()
     def muteAlarm(self) -> None:
@@ -700,8 +720,18 @@ class Backend(QObject):
 
     @Slot(str)
     def testAlarm(self, name: str) -> None:
-        self.alarm.set_sound(name)
-        self.alarm.test()
+        try:
+            self.alarm.set_sound(name)
+            ok = self.alarm.test()
+            if ok:
+                self._alarm_test_status = f"Playing: {name}"
+            else:
+                p = self.alarm._resolve(name)
+                self._alarm_test_status = f"Failed: {name} not found" if not p else f"Played {name} (check volume/mute)"
+            self.alarmTestStatusChanged.emit(self._alarm_test_status)
+        except Exception as e:
+            self._alarm_test_status = f"Error: {e}"
+            self.alarmTestStatusChanged.emit(self._alarm_test_status)
 
     @Slot(bool)
     def setTtsEnabled(self, enabled: bool) -> None:

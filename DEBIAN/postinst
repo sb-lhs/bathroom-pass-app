@@ -30,6 +30,15 @@ fi
 chmod 666 /etc/hallpass/config.json 2>/dev/null || true
 chmod 666 /etc/hallpass/schedules.json 2>/dev/null || true
 chmod 666 /etc/hallpass/rosters.json 2>/dev/null || true
+for _rf in /etc/hallpass/rosters.json "$HOME/.config/hallpass/rosters.json" /home/*/.config/hallpass/rosters.json; do
+  if [ -f "$_rf" ]; then
+    if python3 -c "import json,sys; p=sys.argv[1]; d=json.load(open(p)); vals=[]; [vals.extend([str(x).strip().lower() for x in v]) if isinstance(v,list) else [vals.extend([str(x).strip().lower() for x in lst]) for lst in v.values() if isinstance(lst,list)] for v in d.values()]; sig={'alex johnson','sam rivera','jordan lee','taylor swift','casey kim','morgan park','riley quinn','jamie fox','avery cole','blake ray','skyler day','quinn lee'}; hits=sum(1 for n in vals if n in sig); import sys; sys.exit(0 if (hits>=3 and hits==len([n for n in vals if n])) else 1)" "$_rf" 2>/dev/null; then
+      echo '{}' > "$_rf" || true
+      chmod 666 "$_rf" 2>/dev/null || true
+      echo "Cleared legacy test rosters in $_rf (now empty — import real rosters via Admin)"
+    fi
+  fi
+done
 if ! python3 -c "import PySide6, cv2" 2>/dev/null; then
   if [ -d /usr/share/hallpass/wheelhouse ] && ls /usr/share/hallpass/wheelhouse/*.whl 1>/dev/null 2>&1; then
     echo "Installing PySide6/opencv from bundled wheelhouse (offline, ~10s)..."

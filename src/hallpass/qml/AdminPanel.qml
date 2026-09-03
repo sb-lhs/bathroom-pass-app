@@ -855,14 +855,14 @@ Dialog {
                         // Alarm Sound bento
                         Rectangle {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 148
+                            Layout.preferredHeight: 168
                             radius: 4
                             color: "#ffffff"
                             border.color: "#d1d5db"
                             ColumnLayout {
                                 anchors.fill: parent
                                 anchors.margins: 16
-                                spacing: 12
+                                spacing: 10
                                 RowLayout {
                                     spacing: 8
                                     Layout.fillWidth: true
@@ -874,7 +874,8 @@ Dialog {
                                 ComboBox { id: soundBox
                                     model: backend ? backend.alarmSounds : []; Component.onCompleted: if (backend) currentIndex = backend.alarmSounds.indexOf(backend.selectedAlarmSound)
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: 38 }
+                                    Layout.preferredHeight: 38
+                                    background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
                                 RowLayout {
                                     spacing: 10
                                     Layout.fillWidth: true
@@ -891,6 +892,7 @@ Dialog {
                                         contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
                                         onClicked: backend.setAlarmSound(soundBox.currentText) }
                                 }
+                                Label { text: backend ? backend.alarmTestStatus : ""; color: backend.alarmTestStatus.indexOf("Failed") >=0 || backend.alarmTestStatus.indexOf("Error") >=0 ? "#991b1b" : "#14532d"; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true; visible: backend.alarmTestStatus !== "" }
                             }
                         }
                         // Offline TTS bento
@@ -1102,55 +1104,51 @@ Dialog {
                     }
                     Rectangle {
                         Layout.fillWidth: true
+                        Layout.preferredHeight: 230
                         radius: 4
                         color: "#ffffff"
                         border.color: "#d1d5db"
                         ColumnLayout {
                             anchors.fill: parent
                             anchors.margins: 16
-                            spacing: 12
+                            spacing: 10
                             Label { text: "Export & System"
                                     color: "#1e3a5f"
                                     font.bold: true
                                     font.pixelSize: 13
                                     Layout.fillWidth: true }
-                            ColumnLayout {
-                                spacing: 10
+                            ComboBox {
+                                id: exportChoice
+                                model: ["Auto-Detect USB (/media)", "Local Folder"]
                                 Layout.fillWidth: true
-                                ComboBox {
-                                    id: exportChoice
-                                    model: ["Auto-Detect USB (/media)", "Local Folder"]
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 38
-                                }
-                                Button {
-                                    text: "Export CSV Logs & Photos"
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 42
-                                    background: Rectangle { color: "#1e3a5f"; radius: 4 }
-                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12; wrapMode: Text.WordWrap }
-                                    onClicked: backend.exportLogs(exportChoice.currentIndex === 0 ? "usb" : "local")
-                                }
+                                Layout.preferredHeight: 38
+                                background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
+                            }
+                            Button {
+                                text: "Export CSV Logs & Photos"
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 42
+                                background: Rectangle { color: "#1e3a5f"; radius: 4 }
+                                contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12; wrapMode: Text.WordWrap }
+                                onClicked: backend.exportLogs(exportChoice.currentIndex === 0 ? "usb" : "local")
                             }
                             Label {
                                 text: backend ? backend.exportStatus : ""
-                                color: "#14532d"
+                                color: backend.exportStatus.indexOf("failed") >= 0 ? "#991b1b" : "#14532d"
                                 wrapMode: Text.WordWrap
                                 Layout.fillWidth: true
-                                font.pixelSize: 12
+                                font.pixelSize: 11
+                                visible: backend.exportStatus !== ""
                             }
-                            Rectangle { Layout.fillWidth: true
-                                    height: 1
-                                    color: "#e5e7eb" }
-                            GridLayout {
-                                columns: 2
-                                columnSpacing: 12
-                                rowSpacing: 12
+                            Rectangle { Layout.fillWidth: true; height: 1; color: "#e5e7eb" }
+                            RowLayout {
+                                spacing: 12
                                 Layout.fillWidth: true
+                                Layout.preferredHeight: 44
                                 Button {
                                     text: "Exit Fullscreen"
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: 44
+                                    Layout.fillHeight: true
                                     background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#d1d5db"; border.width: 1 }
                                     contentItem: Text { text: parent.text; color: "#1e293b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12; wrapMode: Text.WordWrap }
                                     onClicked: { admin.close(); backend.exitFullscreen() }
@@ -1158,7 +1156,7 @@ Dialog {
                                 Button {
                                     text: "Close Application"
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: 44
+                                    Layout.fillHeight: true
                                     background: Rectangle { color: "#ef4444"; radius: 4 }
                                     contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12; wrapMode: Text.WordWrap }
                                     onClicked: {
