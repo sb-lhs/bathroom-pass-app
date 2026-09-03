@@ -210,9 +210,9 @@ ApplicationWindow {
             }
         }
 
-        // Center: Active pass
+        // Center: Active pass — expanded to fill box, Return button dominates
         Rectangle {
-            Layout.preferredWidth: 420
+            Layout.preferredWidth: 480
             Layout.fillHeight: true
             radius: 8
             color: stateMode==="OVERTIME" ? "#fef2f2" : "#ffffff"
@@ -221,11 +221,12 @@ ApplicationWindow {
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 16
+                spacing: 10
                 Label {
                     text: stateMode==="IDLE" ? "IDLE" : (activePassType + " PASS")
                     color: "#1e3a5f"
                     font.family: "Libre Baskerville"
-                    font.pixelSize: 15
+                    font.pixelSize: 16
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
@@ -234,13 +235,16 @@ ApplicationWindow {
                     text: activeStudent || "Select a student"
                     color: activeStudent?"#1e293b":"#64748b"
                     font.family: "Libre Baskerville"
-                    font.pixelSize: 20
+                    font.pixelSize: 26
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    verticalAlignment: Text.AlignVCenter
+                    wrapMode: Text.WordWrap
                 }
 
-                // Timer
+                // Timer — larger to fill between name and button
                 Label {
                     text: {
                         var m = Math.floor(elapsedSeconds/60)
@@ -249,7 +253,7 @@ ApplicationWindow {
                     }
                     color: stateMode==="OVERTIME"?"#991b1b":"#334155"
                     font.family: "Source Sans Pro"
-                    font.pixelSize: 34
+                    font.pixelSize: 42
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
@@ -257,6 +261,7 @@ ApplicationWindow {
                 }
                 ProgressBar {
                     Layout.fillWidth: true
+                    Layout.preferredHeight: 10
                     value: thresholdSeconds>0 ? Math.min(1, elapsedSeconds/thresholdSeconds) : 0
                     visible: stateMode!=="IDLE"
                 }
@@ -264,25 +269,28 @@ ApplicationWindow {
                     text: stateMode==="OVERTIME" ? "OVERTIME — Return pass now" : ""
                     color: "#991b1b"
                     font.family: "Source Sans Pro"
-                    font.pixelSize: 12
+                    font.pixelSize: 13
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
+                    visible: stateMode==="OVERTIME"
                 }
 
-                Item { Layout.fillHeight: true }
+                Item { Layout.fillHeight: true; visible: stateMode==="IDLE" }
 
                 Button {
                     Layout.fillWidth: true
-                    height: 68
+                    Layout.fillHeight: true
+                    Layout.preferredHeight: 110
+                    Layout.minimumHeight: 96
                     text: "Return Pass"
                     font.family: "Source Sans Pro"
-                    font.pixelSize: 18
+                    font.pixelSize: 22
                     font.bold: true
                     enabled: stateMode!=="IDLE"
                     background: Rectangle {
                         color: parent.enabled?"#1e3a5f":"#e5e7eb"
-                        radius: 6
+                        radius: 8
                         border.color: parent.enabled?"#1e3a5f":"#d1d5db"
                         border.width: 1
                     }
@@ -358,19 +366,6 @@ ApplicationWindow {
                             }
                         }
                     }
-                }
-                Button {
-                    Layout.fillWidth: true
-                    height: 60
-                    text: "Get In Line (+)"
-                    font.family: "Source Sans Pro"
-                    font.pixelSize: 16
-                    font.bold: true
-                    background: Rectangle {
-                        color: "#1e3a5f"
-                        radius: 6
-                    }
-                    onClicked: queueDialog.open()
                 }
             }
         }

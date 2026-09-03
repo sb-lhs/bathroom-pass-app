@@ -39,6 +39,17 @@ if [ -d "$ROOT/wheelhouse" ] && ls "$ROOT/wheelhouse"/*.whl 1>/dev/null 2>&1; th
 else
   echo "No wheelhouse/*.whl found — deb will use online pip fallback (run scripts/fetch_wheels.sh on Debian to bundle offline)"
 fi
+if ls "$ROOT/src/hallpass/voices"/*.onnx 1>/dev/null 2>&1; then
+  mkdir -p "$PKG/usr/share/hallpass/voices"
+  cp "$ROOT/src/hallpass/voices"/*.onnx* "$PKG/usr/share/hallpass/voices/" 2>/dev/null || true
+  echo "Bundled Piper voice(s) from src/hallpass/voices"
+elif ls "$ROOT/voices"/*.onnx 1>/dev/null 2>&1; then
+  mkdir -p "$PKG/usr/share/hallpass/voices"
+  cp "$ROOT/voices"/*.onnx* "$PKG/usr/share/hallpass/voices/" 2>/dev/null || true
+  echo "Bundled Piper voice(s) from voices/"
+else
+  echo "No Piper voice found — TTS will fallback to espeak-ng -v en-us (run scripts/fetch_wheels.sh to bundle en_US-lessac-medium)"
+fi
 
 # Launcher
 cat > "$PKG/usr/bin/hallpass-qt" <<'EOF'

@@ -136,35 +136,109 @@ class AlarmService:
 
 
 class TTSService:
-    def __init__(self):
+    def __init__(self, voices_dir: Path | None = None):
         self._tts = None
+        self._piper_voice = None
+        self._piper_model = None
+        # Try bundled Piper first (natural voice, offline)
+        try:
+            candidates = [
+                (voices_dir or Path(__file__).parent / "voices" / "en_US-lessac-medium.onnx"),
+                Path("/usr/share/hallpass/voices/en_US-lessac-medium.onnx"),
+                Path.cwd() / "voices" / "en_US-lessac-medium.onnx",
+                Path.cwd() / "src" / "hallpass" / "voices" / "en_US-lessac-medium.onnx",
+            ]
+            for mp in candidates:
+                if mp.exists() and (mp.with_suffix(".onnx.json").exists() or Path(str(mp) + ".json").exists()):
+                    try:
+                        from piper import PiperVoice  # type: ignore
+
+                        self._piper_voice = PiperVoice.load(str(mp))
+                        self._piper_model = mp
+                        break
+                    except Exception:
+                        continue
+        except Exception:
+            self._piper_voice = None
+        # Qt TTS as second fallback
         if HAS_QT:
             try:
                 self._tts = QTextToSpeech()
+                # Force English voice if available to avoid zh accent
+                try:
+                    for v in self._tts.availableVoices():
+                        name = getattr(v, "name", lambda: "")() if callable(getattr(v, "name", None)) else str(v)
+                        lang = getattr(v, "language", lambda: "")() if callable(getattr(v, "language", None)) else ""
+                        if "en" in str(name).lower() or "en" in str(lang).lower() or "english" in str(name).lower():
+                            self._tts.setVoice(v)
+                            break
+                except Exception:
+                    pass
             except Exception:
                 self._tts = None
 
     def speak(self, text: str) -> None:
         if not text:
             return
+        # 1) Piper (bundled natural voice)
+        if self._piper_voice is not None:
+            try:
+                import tempfile, subprocess, shutil, wave
+
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tf:
+                    wav_path = tf.name
+                try:
+                    # Piper synthesize
+                    with wave.open(wav_path, "wb") as wav_file:
+                        self._piper_voice.synthesize(text, wav_file)
+                    # Play via paplay/aplay
+                    for cmd in ["paplay", "aplay"]:
+                        if shutil.which(cmd):
+                            subprocess.Popen([cmd, wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            return
+                    # Fallback ffplay
+                    if shutil.which("ffplay"):
+                        subprocess.Popen(["ffplay", "-nodisp", "-autoexit", wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        return
+                finally:
+                    # Cleanup after short delay — let player open file
+                    try:
+                        import threading
+
+                        def _unlink(p=wav_path):
+                            import time, pathlib
+
+                            time.sleep(3)
+                            try:
+                                pathlib.Path(p).unlink(missing_ok=True)
+                            except Exception:
+                                pass
+
+                        threading.Thread(target=_unlink, daemon=True).start()
+                    except Exception:
+                        pass
+                return
+            except Exception:
+                pass
+        # 2) Qt TTS with English voice forced
         if self._tts and HAS_QT:
             try:
                 self._tts.say(text)
                 return
             except Exception:
                 pass
-        # Fallback: try espeak via subprocess if Qt TTS unavailable
+        # 3) espeak-ng with explicit en-us (not bare en) to fix accent
         try:
-            import subprocess
+            import subprocess, shutil
 
-            subprocess.Popen(["espeak-ng", text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if shutil.which("espeak-ng"):
+                subprocess.Popen(["espeak-ng", "-v", "en-us", "-s", "150", text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return
+            if shutil.which("espeak"):
+                subprocess.Popen(["espeak", "-v", "en-us", "-s", "150", text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return
         except Exception:
-            try:
-                import subprocess
-
-                subprocess.Popen(["espeak", text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except Exception:
-                pass
+            pass
 
     def available(self) -> bool:
-        return HAS_QT and self._tts is not None
+        return self._piper_voice is not None or (HAS_QT and self._tts is not None)

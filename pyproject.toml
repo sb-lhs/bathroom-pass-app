@@ -1,6 +1,6 @@
 [project]
 name = "hallpass-qt"
-version = "0.2.6"
+version = "0.2.7"
 description = "Native Touchscreen Bathroom & Water Pass System (PySide6/Qt Quick)"
 readme = "README.md"
 requires-python = ">=3.10"

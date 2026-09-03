@@ -21,6 +21,12 @@ hallpass-qt_1.4.0_amd64/
 hallpass-qt_0.2.*_amd64/
 wheelhouse/*.whl
 !wheelhouse/.gitkeep
+src/hallpass/voices/*.onnx
+src/hallpass/voices/*.onnx.json
+voices/*.onnx
+voices/*.onnx.json
+!src/hallpass/voices/.gitkeep
+!voices/.gitkeep
 .omo/
 .codegraph/
 .DS_Store
