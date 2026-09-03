@@ -472,12 +472,15 @@ Dialog {
                         }
                     }
                     Rectangle {
+                        id: manualScheduleRect
                         Layout.fillWidth: true
+                        Layout.preferredHeight: manualScheduleCol.implicitHeight + 32
                         radius: 4
                         color: "#ffffff"
                         border.color: "#1e3a5f"
                         border.width: 1
                         ColumnLayout {
+                            id: manualScheduleCol
                             anchors.fill: parent
                             anchors.margins: 16
                             spacing: 12
@@ -515,11 +518,13 @@ Dialog {
                                     delegate: Rectangle {
                                         property string tmplName: modelData
                                         Layout.fillWidth: true
+                                        Layout.preferredHeight: tmplInner.implicitHeight + 24
                                         radius: 6
                                         color: "#f8fafc"
                                         border.color: modelData === "Simple" ? "#3b82f6" : "#cbd5e1"
                                         border.width: 1
                                         ColumnLayout {
+                                            id: tmplInner
                                             anchors.fill: parent
                                             anchors.margins: 12
                                             spacing: 8
