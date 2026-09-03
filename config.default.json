@@ -1,0 +1,11 @@
+{
+  "first_run": true,
+  "default_admin_pass": "admin123",
+  "admin_password_hash": "",
+  "salt": "",
+  "bathroom_threshold_seconds": 420,
+  "water_threshold_seconds": 180,
+  "selected_alarm_sound": "mixkit-facility-alarm-sound-999.wav",
+  "tts_enabled": true,
+  "active_schedule_profile_override": null
+}

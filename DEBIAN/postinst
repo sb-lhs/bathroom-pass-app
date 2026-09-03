@@ -5,19 +5,27 @@ mkdir -p /etc/hallpass
 mkdir -p /var/lib/hallpass/photos
 chmod 755 /etc/hallpass
 chmod 755 /var/lib/hallpass
-# Install defaults if missing
+# First-Run pattern: copy default template ONLY if user config does not exist
+# Never overwrite an existing teacher's custom password on upgrade
 if [ ! -f /etc/hallpass/config.json ]; then
-  cat > /etc/hallpass/config.json <<'EOF'
+  if [ -f /usr/share/hallpass/config.default.json ]; then
+    cp /usr/share/hallpass/config.default.json /etc/hallpass/config.json
+  else
+    cat > /etc/hallpass/config.json <<'EOF'
 {
+  "first_run": true,
+  "default_admin_pass": "admin123",
+  "admin_password_hash": "",
+  "salt": "",
   "bathroom_threshold_seconds": 420,
   "water_threshold_seconds": 180,
-  "admin_password_hash": "3172b94d2710d7ca55abb3a06a83b09991984aff0ee205b4b61ea51a6ea4d609",
-  "salt": "hallpass_secure_salt",
   "selected_alarm_sound": "classic_chime.wav",
   "tts_enabled": true,
   "active_schedule_profile_override": null
 }
 EOF
+  fi
+  chmod 600 /etc/hallpass/config.json || true
 fi
 if [ ! -f /etc/hallpass/schedules.json ]; then
   cp /usr/share/hallpass/default_schedules.json /etc/hallpass/schedules.json || true

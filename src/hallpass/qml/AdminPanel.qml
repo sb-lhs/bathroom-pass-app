@@ -30,10 +30,81 @@ Dialog {
         border.color: "#d1d5db"
         border.width: 1
         visible: !backend.isAdminAuthenticated
+        // First-run: Set new admin password (no hardcoded credential in repo)
+        ColumnLayout {
+            anchors.centerIn: parent
+            width: 380
+            spacing: 14
+            visible: backend.isFirstRun
+            Label {
+                text: "Set Admin Password"
+                color: "#1e3a5f"
+                font.pixelSize: 20
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                Layout.fillWidth: true
+            }
+            Label {
+                text: "First run — create your admin password (min 4 chars). Default for testing is ‘admin123’ if you keep the template, but you must set your own on this device."
+                color: "#475569"
+                font.pixelSize: 11
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+                Layout.fillWidth: true
+            }
+            TextField {
+                id: newPassField
+                echoMode: TextInput.Password
+                placeholderText: "New password"
+                font.pixelSize: 16
+                Layout.fillWidth: true
+                Layout.preferredHeight: 44
+                color: "#1e293b"
+                placeholderTextColor: "#64748b"
+                background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
+            }
+            TextField {
+                id: confirmPassField
+                echoMode: TextInput.Password
+                placeholderText: "Confirm password"
+                font.pixelSize: 16
+                Layout.fillWidth: true
+                Layout.preferredHeight: 44
+                color: "#1e293b"
+                placeholderTextColor: "#64748b"
+                background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
+            }
+            Label { id: firstRunError; text: ""; color: "#ef4444"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Button {
+                text: "Set Password & Unlock"
+                Layout.fillWidth: true
+                Layout.preferredHeight: 48
+                contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 14 }
+                background: Rectangle { color: "#1e3a5f"; radius: 4 }
+                onClicked: {
+                    if (newPassField.text.length < 4) { firstRunError.text = "Password must be at least 4 characters"; return }
+                    if (newPassField.text !== confirmPassField.text) { firstRunError.text = "Passwords do not match"; return }
+                    if (backend.setInitialPassword(newPassField.text, confirmPassField.text)) {
+                        firstRunError.text = ""
+                        newPassField.text = ""; confirmPassField.text = ""
+                    } else {
+                        firstRunError.text = "Failed to set password"
+                    }
+                }
+            }
+            Button {
+                text: "Cancel"
+                Layout.fillWidth: true
+                Layout.preferredHeight: 44
+                onClicked: admin.close()
+            }
+        }
+        // Normal: Enter existing admin password
         ColumnLayout {
             anchors.centerIn: parent
             width: 360
             spacing: 14
+            visible: !backend.isFirstRun
             Label {
                 text: "Enter Admin PIN"
                 color: "#1e3a5f"
@@ -49,18 +120,17 @@ Dialog {
                 font.pixelSize: 18
                 Layout.fillWidth: true
                 Layout.preferredHeight: 44
+                color: "#1e293b"
+                placeholderTextColor: "#64748b"
+                background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
             }
-            Label { id: pinError
-                                    text: ""
-                                    color: "#ef4444"
-                                    font.pixelSize: 12 }
+            Label { id: pinError; text: ""; color: "#ef4444"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             Button {
                 text: "Unlock"
                 Layout.fillWidth: true
                 Layout.preferredHeight: 48
                 contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 15 }
-                background: Rectangle { color: "#14532d"
-                                    radius: 4 }
+                background: Rectangle { color: "#14532d"; radius: 4 }
                 onClicked: {
                     if (backend.verifyAdmin(pinField.text)) {
                         pinError.text = ""

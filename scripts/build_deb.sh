@@ -19,6 +19,7 @@ chmod 0755 "$PKG/DEBIAN/postinst"
 cp -r "$ROOT/src/hallpass" "$PKG/usr/lib/hallpass/"
 cp "$ROOT/src/main.py" "$PKG/usr/lib/hallpass/main.py"
 cp "$ROOT/default_schedules.json" "$PKG/usr/share/hallpass/default_schedules.json"
+cp "$ROOT/config.default.json" "$PKG/usr/share/hallpass/config.default.json"
 cp "$ROOT/default_rosters.json" "$PKG/usr/share/hallpass/default_rosters.json"
 cp "$ROOT/hallpass-qt.desktop" "$PKG/usr/share/applications/hallpass-qt.desktop"
 # Sounds

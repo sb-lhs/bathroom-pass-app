@@ -8,7 +8,7 @@ from PySide6.QtCore import QObject, Property, Signal, Slot, QTimer, QUrl
 
 from .audio import AlarmService, TTSService
 from .camera import SilentCamera
-from .config import AppConfig, data_dir, load_config, photos_dir, save_config, threshold_for
+from .config import AppConfig, data_dir, is_first_run, load_config, photos_dir, save_config, set_initial_admin_password, threshold_for
 from .export import detect_usb_drives, export_auto
 from .rosters import (
     PROFILE_A,
@@ -374,6 +374,13 @@ class Backend(QObject):
         return getattr(self, "_photos_status", "")
 
     @Property(bool, notify=configChanged)  # type: ignore
+    def isFirstRun(self) -> bool:
+        try:
+            return is_first_run()
+        except Exception:
+            return False
+
+    @Property(bool, notify=configChanged)  # type: ignore
     def isAdminAuthenticated(self) -> bool:
         return self._is_admin
 
@@ -587,9 +594,35 @@ class Backend(QObject):
         self.sm.mute_alarm()
         self.stateChanged.emit(self.sm.state.value)
 
+    @Slot(str, str, result=bool)
+    def setInitialPassword(self, new_password: str, confirm_password: str) -> bool:
+        if not new_password or new_password != confirm_password:
+            self._is_admin = False
+            self.configChanged.emit()
+            return False
+        if len(new_password) < 4:
+            self._is_admin = False
+            self.configChanged.emit()
+            return False
+        try:
+            self.cfg = set_initial_admin_password(new_password)
+            self._is_admin = True
+            self.configChanged.emit()
+            return True
+        except Exception:
+            self._is_admin = False
+            self.configChanged.emit()
+            return False
+
     @Slot(str, result=bool)
     def verifyAdmin(self, password: str) -> bool:
+        # Test mode bypass handled in AppConfig.verify_password
         ok = self.cfg.verify_password(password)
+        # Refresh cfg in case first_run state changed
+        try:
+            self.cfg = load_config()
+        except Exception:
+            pass
         self._is_admin = ok
         self.configChanged.emit()
         return ok

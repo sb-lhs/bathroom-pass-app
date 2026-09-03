@@ -8,6 +8,12 @@ data/photos/
 data/*.db
 data/*.csv
 data/*.log
+# Runtime config & generated data (first-run pattern — never commit real hashes)
+config.json
+/etc/hallpass/config.json
+/var/lib/hallpass/logs.db
+/var/lib/hallpass/pass_history.csv
+/var/lib/hallpass/photos/
 *.deb
 hallpass-qt_*.deb
 hallpass-qt_0.1.0_amd64/
