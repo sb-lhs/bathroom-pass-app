@@ -706,6 +706,118 @@ class Backend(QObject):
             return False
 
     @Slot(str, str, result=bool)
+    def createTemplate(self, name: str, copyFrom: str) -> bool:
+        try:
+            n = name.strip()
+            if not n:
+                return False
+            t = get_templates()
+            if n in t:
+                return False
+            src = t.get(copyFrom.strip(), t.get("Regular", []))
+            t[n] = [dict(b) for b in src]
+            set_templates(t)
+            self.scheduleChanged.emit()
+            return True
+        except Exception:
+            return False
+
+    @Slot(str, str, str, str, result=bool)
+    def addBlockToTemplate(self, template: str, name: str, start: str, end: str) -> bool:
+        try:
+            tname = template.strip()
+            n = name.strip()
+            if not tname or not n:
+                return False
+            t = get_templates()
+            if tname not in t:
+                return False
+            if any(b.get("name","").lower()==n.lower() for b in t[tname]):
+                self._roster_import_status = f"Block '{n}' already in {tname}"
+                self.rosterImportStatusChanged.emit(self._roster_import_status)
+                return False
+            def ok(x: str) -> bool:
+                try: h,m = x.split(":"); return 0 <= int(h) <=23 and 0 <= int(m) <=59
+                except: return False
+            if not ok(start) or not ok(end):
+                self._roster_import_status = "Use HH:MM"
+                self.rosterImportStatusChanged.emit(self._roster_import_status)
+                return False
+            t[tname].append({"name": n, "start": start.strip(), "end": end.strip()})
+            t[tname] = sorted(t[tname], key=lambda x: x["start"])
+            set_templates(t)
+            self.scheduleChanged.emit()
+            self._resolve_block()
+            self.activeBlockChanged.emit(self._block_id)
+            return True
+        except Exception as e:
+            self._roster_import_status = f"Add failed: {e}"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return False
+
+    @Slot(str, str, str, str, str, result=bool)
+    def updateBlockInTemplate(self, template: str, oldName: str, newName: str, start: str, end: str) -> bool:
+        try:
+            tname = template.strip()
+            t = get_templates()
+            if tname not in t:
+                return False
+            idx = -1
+            for i,b in enumerate(t[tname]):
+                if b.get("name")==oldName.strip():
+                    idx = i; break
+            if idx==-1:
+                return False
+            nn = newName.strip()
+            if oldName.strip().lower()!=nn.lower() and any(b.get("name","").lower()==nn.lower() for b in t[tname]):
+                self._roster_import_status = f"Block '{nn}' already in {tname}"
+                self.rosterImportStatusChanged.emit(self._roster_import_status)
+                return False
+            t[tname][idx] = {"name": nn, "start": start.strip(), "end": end.strip()}
+            t[tname] = sorted(t[tname], key=lambda x: x["start"])
+            set_templates(t)
+            if oldName.strip()!=nn:
+                try: rename_block_roster(oldName.strip(), nn)
+                except: pass
+            self.scheduleChanged.emit()
+            self._resolve_block()
+            self.activeBlockChanged.emit(self._block_id)
+            self.rosterChanged.emit()
+            return True
+        except Exception as e:
+            self._roster_import_status = f"Update failed: {e}"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return False
+
+    @Slot(str, str, result=bool)
+    def deleteBlockFromTemplate(self, template: str, name: str) -> bool:
+        try:
+            tname = template.strip()
+            t = get_templates()
+            if tname not in t:
+                return False
+            n = name.strip()
+            nb = [b for b in t[tname] if b.get("name")!=n]
+            if len(nb)==len(t[tname]):
+                return False
+            if len(nb)==0:
+                self._roster_import_status = "Keep at least one block"
+                self.rosterImportStatusChanged.emit(self._roster_import_status)
+                return False
+            t[tname]=nb
+            set_templates(t)
+            self.scheduleChanged.emit()
+            self._resolve_block()
+            self.activeBlockChanged.emit(self._block_id)
+            return True
+        except Exception as e:
+            self._roster_import_status = f"Delete failed: {e}"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return False
+        except Exception:
+            return False
+
+    @Slot(str, str, result=bool)
     def setWeekdayTemplate(self, weekday: str, template: str) -> bool:
         try:
             from .schedules import set_weekday_template

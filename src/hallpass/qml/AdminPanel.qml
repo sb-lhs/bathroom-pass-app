@@ -471,7 +471,124 @@ Dialog {
                             }
                         }
                     }
-                    // Add Block card
+                    Rectangle {
+                        Layout.fillWidth: true
+                        radius: 4
+                        color: "#ffffff"
+                        border.color: "#1e3a5f"
+                        border.width: 1
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 12
+                            RowLayout {
+                                spacing: 8
+                                Layout.fillWidth: true
+                                Rectangle { color: "#1e3a5f"; radius: 4; Layout.preferredWidth: 4; Layout.preferredHeight: 16 }
+                                Label { text: "Bell Templates — Manual Schedule (no import needed)"
+                                    color: "#1e3a5f"
+                                    font.bold: true
+                                    font.pixelSize: 14
+                                    Layout.fillWidth: true }
+                                Label { text: Object.keys(backend.templates).length + " templates"; color: "#475569"; font.pixelSize: 11 }
+                            }
+                            Label { text: "Create any bell schedule — Regular, Wednesday, Half Day, etc. Each template has its own blocks/times. Pick the weekday template above to use it without any calendar file. Names are yours — not baked in."; color: "#475569"; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 11 }
+                            RowLayout {
+                                spacing: 8
+                                Layout.fillWidth: true
+                                TextField { id: newTemplateName; placeholderText: "New template name (e.g., Late Start)"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
+                                ComboBox { id: copyFromTemplate; model: Object.keys(backend.templates).length ? Object.keys(backend.templates) : ["Regular"]; Layout.preferredWidth: 150; Layout.preferredHeight: 36; background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 } contentItem: Text { text: "Copy from " + parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 11 } }
+                                Button {
+                                    text: "Create"
+                                    Layout.preferredWidth: 80
+                                    Layout.preferredHeight: 36
+                                    background: Rectangle { color: "#14532d"; radius: 4 }
+                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                    onClicked: if (backend.createTemplate(newTemplateName.text, copyFromTemplate.currentText)) newTemplateName.text = ""
+                                }
+                            }
+                            ColumnLayout {
+                                spacing: 16
+                                Layout.fillWidth: true
+                                Repeater {
+                                    model: Object.keys(backend.templates)
+                                    delegate: Rectangle {
+                                        property string tmplName: modelData
+                                        Layout.fillWidth: true
+                                        radius: 6
+                                        color: "#f8fafc"
+                                        border.color: modelData === "Simple" ? "#3b82f6" : "#cbd5e1"
+                                        border.width: 1
+                                        ColumnLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 12
+                                            spacing: 8
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 8
+                                                Label { text: modelData; color: modelData === "Simple" ? "#1d4ed8" : "#1e3a5f"; font.bold: true; font.pixelSize: 13; Layout.fillWidth: true; elide: Text.ElideRight }
+                                                Label { text: (backend.templates[modelData] ? backend.templates[modelData].length : 0) + " blocks"; color: "#475569"; font.pixelSize: 11 }
+                                                Button {
+                                                    text: "Delete Template"
+                                                    visible: Object.keys(backend.templates).length > 1 && modelData !== "Simple"
+                                                    Layout.preferredWidth: 120
+                                                    Layout.preferredHeight: 30
+                                                    background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#991b1b" }
+                                                    contentItem: Text { text: parent.text; color: "#991b1b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 11 }
+                                                    onClicked: backend.deleteTemplate(modelData)
+                                                }
+                                            }
+                                            Repeater {
+                                                model: backend.templates[modelData]
+                                                delegate: RowLayout {
+                                                    spacing: 6
+                                                    Layout.fillWidth: true
+                                                    property string tName: modelData.name
+                                                    TextField { id: tBlockName; text: modelData.name; Layout.preferredWidth: 160; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
+                                                    TextField { id: tBlockStart; text: modelData.start; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
+                                                    Label { text: "→"; color: "#475569"; font.pixelSize: 12 }
+                                                    TextField { id: tBlockEnd; text: modelData.end; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
+                                                    Button {
+                                                        text: "Save"
+                                                        Layout.preferredWidth: 54
+                                                        Layout.preferredHeight: 34
+                                                        background: Rectangle { color: "#1e3a5f"; radius: 4 }
+                                                        contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 11; font.bold: true }
+                                                        onClicked: backend.updateBlockInTemplate(tmplName, tName, tBlockName.text, tBlockStart.text, tBlockEnd.text)
+                                                    }
+                                                    Button {
+                                                        text: "X"
+                                                        Layout.preferredWidth: 34
+                                                        Layout.preferredHeight: 34
+                                                        background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#991b1b" }
+                                                        contentItem: Text { text: parent.text; color: "#991b1b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 11 }
+                                                        onClicked: backend.deleteBlockFromTemplate(tmplName, tName)
+                                                    }
+                                                }
+                                            }
+                                            RowLayout {
+                                                spacing: 6
+                                                Layout.fillWidth: true
+                                                TextField { id: addTName; placeholderText: "Block"; Layout.preferredWidth: 120; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
+                                                TextField { id: addTStart; placeholderText: "08:00"; text: "08:00"; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
+                                                Label { text: "→"; color: "#475569"; font.pixelSize: 12 }
+                                                TextField { id: addTEnd; placeholderText: "09:20"; text: "09:20"; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
+                                                Button {
+                                                    text: "Add to " + tmplName
+                                                    Layout.fillWidth: true
+                                                    Layout.preferredHeight: 34
+                                                    background: Rectangle { color: "#334155"; radius: 4 }
+                                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 11; font.bold: true }
+                                                    onClicked: if (backend.addBlockToTemplate(tmplName, addTName.text, addTStart.text, addTEnd.text)) addTName.text=""
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // Legacy quick Add Block (still works on global blocks)
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 170
