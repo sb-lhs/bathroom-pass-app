@@ -410,7 +410,7 @@ Dialog {
                             RowLayout {
                                 spacing: 8
                                 Layout.fillWidth: true
-                                TextField { id: customDateField; placeholderText: "YYYY-MM-DD"; Layout.preferredWidth: 130; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
+                                TextField { id: customDateField; placeholderText: "YYYY-MM-DD"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 130; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; radius: 4 } }
                                 ComboBox { id: customTemplateBox; model: Object.keys(backend.templates).length ? Object.keys(backend.templates) : ["Regular"]; Layout.preferredWidth: 150; Layout.preferredHeight: 36; background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 } contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 12 } }
                                 ComboBox { id: customLetterBox; model: ["Everyday", "A", "B"]; Layout.preferredWidth: 90; Layout.preferredHeight: 36; background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 } contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 12 } }
                                 Button {
@@ -499,7 +499,7 @@ Dialog {
                             RowLayout {
                                 spacing: 8
                                 Layout.fillWidth: true
-                                TextField { id: newTemplateName; placeholderText: "New template name (e.g., Late Start)"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
+                                TextField { id: newTemplateName; placeholderText: "New template name (e.g., Late Start)"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
                                 ComboBox { id: copyFromTemplate; model: Object.keys(backend.templates).length ? Object.keys(backend.templates) : ["Regular"]; Layout.preferredWidth: 150; Layout.preferredHeight: 36; background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 } contentItem: Text { text: "Copy from " + parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 11 } }
                                 Button {
                                     text: "Create"
@@ -549,10 +549,10 @@ Dialog {
                                                     spacing: 6
                                                     Layout.fillWidth: true
                                                     property string tName: modelData.name
-                                                    TextField { id: tBlockName; text: modelData.name; Layout.preferredWidth: 160; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
-                                                    TextField { id: tBlockStart; text: modelData.start; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
-                                                    Label { text: "→"; color: "#475569"; font.pixelSize: 12 }
-                                                    TextField { id: tBlockEnd; text: modelData.end; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
+                                                    TextField { id: tBlockName; text: modelData.name; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 160; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#334155"; border.width: 1; radius: 4 } }
+                                                    TextField { id: tBlockStart; text: modelData.start; color: "#0f172a"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#334155"; border.width: 1; radius: 4 } }
+                                                    Label { text: "→"; color: "#0f172a"; font.pixelSize: 12; font.bold: true }
+                                                    TextField { id: tBlockEnd; text: modelData.end; color: "#0f172a"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#334155"; border.width: 1; radius: 4 } }
                                                     Button {
                                                         text: "Save"
                                                         Layout.preferredWidth: 54
@@ -574,10 +574,10 @@ Dialog {
                                             RowLayout {
                                                 spacing: 6
                                                 Layout.fillWidth: true
-                                                TextField { id: addTName; placeholderText: "Block"; Layout.preferredWidth: 120; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
-                                                TextField { id: addTStart; placeholderText: "08:00"; text: "08:00"; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
-                                                Label { text: "→"; color: "#475569"; font.pixelSize: 12 }
-                                                TextField { id: addTEnd; placeholderText: "09:20"; text: "09:20"; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
+                                                TextField { id: addTName; placeholderText: "Block"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 120; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
+                                                TextField { id: addTStart; placeholderText: "08:00"; text: "08:00"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
+                                                Label { text: "→"; color: "#0f172a"; font.pixelSize: 12; font.bold: true }
+                                                TextField { id: addTEnd; placeholderText: "09:20"; text: "09:20"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
                                                 Button {
                                                     text: "Add to " + tmplName
                                                     Layout.fillWidth: true
