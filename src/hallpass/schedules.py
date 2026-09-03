@@ -90,12 +90,17 @@ TEMPLATES: dict[str, list[dict[str, str]]] = {
 }
 
 
+def default_weekday_templates() -> dict[str, str]:
+    return {wd: "Regular" for wd in WEEKDAYS}
+
+
 def default_schedules() -> dict[str, Any]:
     return {
         "blocks": default_blocks(),
         "templates": {k: list(v) for k, v in TEMPLATES.items()},
         "date_overrides": {},
         "custom_days": {},
+        "weekday_templates": default_weekday_templates(),
         "day_defaults": {wd: "Everyday" for wd in WEEKDAYS},
         "profiles": {},
     }
@@ -207,17 +212,26 @@ def load_schedules() -> dict[str, Any]:
             templates = _normalize_templates(raw.get("templates", {"Regular": nblocks}))
             date_overrides = _normalize_date_map(raw.get("date_overrides", {}))
             custom_days = _normalize_date_map(raw.get("custom_days", {}))
+            wt_raw = raw.get("weekday_templates", {})
+            if not isinstance(wt_raw, dict):
+                wt_raw = {}
+            weekday_templates = {wd: _norm_template_name(wt_raw.get(wd, "Regular")) for wd in WEEKDAYS}
             profiles = raw.get("profiles") if isinstance(raw.get("profiles"), dict) else {}
-            return {"blocks": nblocks, "templates": templates, "date_overrides": date_overrides, "custom_days": custom_days, "day_defaults": new_dd, "profiles": profiles}
+            return {"blocks": nblocks, "templates": templates, "date_overrides": date_overrides, "custom_days": custom_days, "weekday_templates": weekday_templates, "day_defaults": new_dd, "profiles": profiles}
         if "profiles" in raw:
             migrated = _migrate_legacy_to_blocks(raw)
             migrated["templates"] = {"Regular": list(migrated["blocks"])}
             migrated["date_overrides"] = {}
             migrated["custom_days"] = {}
+            migrated["weekday_templates"] = default_weekday_templates()
             return migrated
         if "templates" in raw:
             templates = _normalize_templates(raw.get("templates"))
-            return {"blocks": default_blocks(), "templates": templates, "date_overrides": _normalize_date_map(raw.get("date_overrides")), "custom_days": _normalize_date_map(raw.get("custom_days")), "day_defaults": {wd: "Everyday" for wd in WEEKDAYS}, "profiles": {}}
+            wt_raw = raw.get("weekday_templates", {})
+            if not isinstance(wt_raw, dict):
+                wt_raw = {}
+            weekday_templates = {wd: _norm_template_name(wt_raw.get(wd, "Regular")) for wd in WEEKDAYS}
+            return {"blocks": default_blocks(), "templates": templates, "date_overrides": _normalize_date_map(raw.get("date_overrides")), "custom_days": _normalize_date_map(raw.get("custom_days")), "weekday_templates": weekday_templates, "day_defaults": {wd: "Everyday" for wd in WEEKDAYS}, "profiles": {}}
         return default_schedules()
     except Exception:
         return default_schedules()
@@ -258,6 +272,10 @@ def save_schedules(data: dict[str, Any]) -> None:
         data["templates"] = _normalize_templates(data.get("templates", {"Regular": nblocks}))
         data["date_overrides"] = _normalize_date_map(data.get("date_overrides", {}))
         data["custom_days"] = _normalize_date_map(data.get("custom_days", {}))
+        wt_raw = data.get("weekday_templates", {})
+        if not isinstance(wt_raw, dict):
+            wt_raw = {}
+        data["weekday_templates"] = {wd: _norm_template_name(wt_raw.get(wd, "Regular")) for wd in WEEKDAYS}
         data["profiles"] = data.get("profiles", {}) if isinstance(data.get("profiles"), dict) else {}
     p.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
@@ -288,13 +306,34 @@ def _parse_day_value(raw: str) -> tuple[str, str]:
     return _norm_template_name(s), "Everyday"
 
 
-def _resolve_today_entry(data: dict[str, Any], today_key: str) -> tuple[str, str] | None:
+def _resolve_today_entry(data: dict[str, Any], today_key: str, weekday: str | None = None) -> tuple[str, str] | None:
     custom = data.get("custom_days", {})
     over = data.get("date_overrides", {})
+    # weekday_templates fallback for template when only letter supplied
+    wt = data.get("weekday_templates", {})
+    default_template = "Regular"
+    if weekday and isinstance(wt, dict) and wt.get(weekday):
+        default_template = _norm_template_name(wt.get(weekday))
     if isinstance(custom, dict) and today_key in custom and str(custom[today_key]).strip():
-        return _parse_day_value(str(custom[today_key]))
+        raw = str(custom[today_key]).strip()
+        if ":" in raw:
+            return _parse_day_value(raw)
+        # letter-only → combine with weekday template
+        norm_letter = _norm_day_type(raw)
+        if norm_letter in ("A", "B", "Everyday"):
+            return default_template, norm_letter
+        return _parse_day_value(raw)
     if isinstance(over, dict) and today_key in over and str(over[today_key]).strip():
-        return _parse_day_value(str(over[today_key]))
+        raw = str(over[today_key]).strip()
+        if ":" in raw:
+            return _parse_day_value(raw)
+        norm_letter = _norm_day_type(raw)
+        if norm_letter in ("A", "B", "Everyday"):
+            return default_template, norm_letter
+        return _parse_day_value(raw)
+    # No date-specific entry → fall back to weekday template with Everyday (set-and-forget)
+    if weekday:
+        return default_template, "Everyday"
     return None
 
 
@@ -303,19 +342,20 @@ def active_block(now: datetime | None = None, override: str | None = None) -> tu
     if now is None:
         now = datetime.now()
     today_key = now.strftime("%Y-%m-%d")
+    weekday = WEEKDAYS[now.weekday()]
     if override and override in ("A", "B", "Everyday"):
         today_letter = override
-        template_name = "Regular"
+        template_name = _norm_template_name(data.get("weekday_templates", {}).get(weekday, "Regular"))
     elif override and ":" in override:
         template_name, today_letter = _parse_day_value(override)
     elif override:
         template_name, today_letter = _parse_day_value(override)
         if today_letter == "Everyday" and ":" not in override:
-            resolved = _resolve_today_entry(data, today_key)
+            resolved = _resolve_today_entry(data, today_key, weekday)
             if resolved:
                 template_name, today_letter = resolved
     else:
-        resolved = _resolve_today_entry(data, today_key)
+        resolved = _resolve_today_entry(data, today_key, weekday)
         if resolved is None:
             return "", ""
         template_name, today_letter = resolved
@@ -339,17 +379,33 @@ def resolve_today_letter(now: datetime | None = None, override: str | None = Non
     if now is None:
         now = datetime.now()
     today_key = now.strftime("%Y-%m-%d")
+    weekday = WEEKDAYS[now.weekday()]
     if override and override in ("A", "B", "Everyday"):
         return override
     if override:
         _, letter = _parse_day_value(override)
         if letter in ("A", "B", "Everyday"):
             return letter
-    resolved = _resolve_today_entry(data, today_key)
+    resolved = _resolve_today_entry(data, today_key, weekday)
     if resolved:
         _, letter = resolved
         return letter
     return "Everyday"
+
+
+def get_weekday_templates() -> dict[str, str]:
+    return dict(load_schedules().get("weekday_templates", default_weekday_templates()))
+
+
+def set_weekday_template(weekday: str, template_name: str) -> None:
+    data = load_schedules()
+    wt = data.get("weekday_templates", {})
+    if not isinstance(wt, dict):
+        wt = {}
+    if weekday in WEEKDAYS:
+        wt[weekday] = _norm_template_name(template_name)
+    data["weekday_templates"] = {wd: _norm_template_name(wt.get(wd, "Regular")) for wd in WEEKDAYS}
+    save_schedules(data)
 
 
 def get_templates() -> dict[str, list[dict[str, str]]]:

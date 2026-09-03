@@ -362,20 +362,20 @@ Dialog {
                     }
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 210
+                        Layout.preferredHeight: 340
                         radius: 4
                         color: "#ffffff"
                         border.color: "#d1d5db"
                         ColumnLayout {
                             anchors.fill: parent
                             anchors.margins: 16
-                            spacing: 12
-                            Label { text: "Weekday → A/B Day"
+                            spacing: 10
+                            Label { text: "Weekday → Bell Template (set-and-forget)"
                                     color: "#1e3a5f"
                                     font.bold: true
                                     font.pixelSize: 13
                                     Layout.fillWidth: true }
-                            Label { text: "Choose which letter day each weekday is. Blocks tagged A only appear on A days, B on B days, Everyday on both."
+                            Label { text: "Which bell times each weekday uses when no calendar date. Keep all Regular, or set Wednesday to a different template for its shorter day."
                                     color: "#475569"
                                     font.pixelSize: 11
                                     wrapMode: Text.WordWrap
@@ -383,21 +383,18 @@ Dialog {
                             GridLayout {
                                 columns: 2
                                 columnSpacing: 24
-                                rowSpacing: 10
+                                rowSpacing: 8
                                 Layout.fillWidth: true
                                 Repeater {
                                     model: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
                                     delegate: RowLayout {
                                         spacing: 10
                                         Layout.fillWidth: true
-                                        Label { text: modelData
-                                            color: "#1e293b"
-                                    Layout.preferredWidth: 85
-                                    font.pixelSize: 13 }
+                                        Label { text: modelData; color: "#1e293b"; Layout.preferredWidth: 85; font.pixelSize: 13 }
                                         ComboBox {
-                                            model: ["A", "B", "Late Start", "Early Dismissal", "PowerHour"]
-                                            currentIndex: Math.max(0, ["A", "B", "Late Start", "Early Dismissal", "PowerHour"].indexOf(backend.dayDefaults[modelData] || "A"))
-                                            onActivated: backend.setDayDefault(modelData, currentText)
+                                            model: Object.keys(backend.templates).length ? Object.keys(backend.templates) : ["Regular"]
+                                            currentIndex: Math.max(0, Object.keys(backend.templates).indexOf(backend.weekdayTemplates[modelData] || "Regular"))
+                                            onActivated: backend.setWeekdayTemplate(modelData, currentText)
                                             Layout.preferredWidth: 170
                                             Layout.preferredHeight: 36
                                             Layout.fillWidth: true
@@ -406,6 +403,71 @@ Dialog {
                                         }
                                     }
                                 }
+                            }
+                            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#e2e8f0" }
+                            Label { text: "Custom Day (overrides calendar & weekday)"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
+                            Label { text: "One-off: e.g. 2026-09-03 → B or Regular Wednesday:A. Custom abrogates calendar."; color: "#64748b"; font.pixelSize: 10; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                            RowLayout {
+                                spacing: 8
+                                Layout.fillWidth: true
+                                TextField { id: customDateField; placeholderText: "YYYY-MM-DD"; Layout.preferredWidth: 130; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
+                                ComboBox { id: customTemplateBox; model: Object.keys(backend.templates).length ? Object.keys(backend.templates) : ["Regular"]; Layout.preferredWidth: 150; Layout.preferredHeight: 36; background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 } contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 12 } }
+                                ComboBox { id: customLetterBox; model: ["Everyday", "A", "B"]; Layout.preferredWidth: 90; Layout.preferredHeight: 36; background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 } contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 12 } }
+                                Button {
+                                    text: "Set"
+                                    Layout.preferredWidth: 60
+                                    Layout.preferredHeight: 36
+                                    background: Rectangle { color: "#1e3a5f"; radius: 4 }
+                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                    onClicked: {
+                                        var v = customTemplateBox.currentText + ":" + customLetterBox.currentText
+                                        if (customDateField.text.length === 10) backend.setCustomDay(customDateField.text, v)
+                                    }
+                                }
+                                Button {
+                                    text: "Clear"
+                                    Layout.preferredWidth: 60
+                                    Layout.preferredHeight: 36
+                                    background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#64748b" }
+                                    contentItem: Text { text: parent.text; color: "#334155"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 12 }
+                                    onClicked: if (customDateField.text.length === 10) backend.setCustomDay(customDateField.text, "")
+                                }
+                            }
+                            Label { text: "Calendar Import — source of truth (replaces all dates)"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
+                            RowLayout {
+                                spacing: 8
+                                Layout.fillWidth: true
+                                Button {
+                                    text: "Import CSV"
+                                    Layout.preferredWidth: 110
+                                    Layout.preferredHeight: 36
+                                    background: Rectangle { color: "#334155"; radius: 4 }
+                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                    onClicked: calendarCsvDialog.open()
+                                }
+                                Button {
+                                    text: "Import ICS"
+                                    Layout.preferredWidth: 110
+                                    Layout.preferredHeight: 36
+                                    background: Rectangle { color: "#334155"; radius: 4 }
+                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                    onClicked: calendarIcsDialog.open()
+                                }
+                                Label {
+                                    text: Object.keys(backend.dateOverrides).length + " dates loaded"
+                                    color: "#475569"
+                                    font.pixelSize: 11
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                }
+                            }
+                            Label {
+                                text: backend ? backend.rosterImportStatus : ""
+                                color: backend.rosterImportStatus.indexOf("failed")>=0 ? "#991b1b" : "#14532d"
+                                wrapMode: Text.WordWrap
+                                Layout.fillWidth: true
+                                font.pixelSize: 10
+                                visible: backend.rosterImportStatus !== "" && admin.currentTab==="Schedules"
                             }
                         }
                     }
@@ -446,7 +508,7 @@ Dialog {
                                 TextField { id: newStart; placeholderText: "Start 08:00"; text: "08:00"; color: "#1e293b"; placeholderTextColor: "#64748b"; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } Layout.preferredWidth: 110; Layout.preferredHeight: 38; font.pixelSize: 13 }
                                 Label { text: "→"; color: "#475569"; font.pixelSize: 16 }
                                 TextField { id: newEnd; placeholderText: "End 09:30"; text: "09:30"; color: "#1e293b"; placeholderTextColor: "#64748b"; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } Layout.preferredWidth: 110; Layout.preferredHeight: 38; font.pixelSize: 13 }
-                                ComboBox { id: newDayType; model: ["Everyday", "A", "B", "Late Start", "Early Dismissal", "PowerHour"]; Layout.preferredWidth: 140; Layout.preferredHeight: 38; background: Rectangle { color: "#ffffff"; border.color: "#1e3a5f"; border.width: 1; radius: 4 } contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 10; font.pixelSize: 13 } }
+                                ComboBox { id: newDayType; model: ["Everyday", "A", "B"]; Layout.preferredWidth: 110; Layout.preferredHeight: 38; background: Rectangle { color: "#ffffff"; border.color: "#1e3a5f"; border.width: 1; radius: 4 } contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 10; font.pixelSize: 13 } }
                                 Button {
                                     text: "Create Block"
                                     Layout.preferredHeight: 38
@@ -536,9 +598,9 @@ Dialog {
                                         }
                                         ComboBox {
                                             id: editDay
-                                            model: ["Everyday", "A", "B", "Late Start", "Early Dismissal", "PowerHour"]
-                                            currentIndex: Math.max(0, ["Everyday", "A", "B", "Late Start", "Early Dismissal", "PowerHour"].indexOf(modelData.day_type || "Everyday"))
-                                            Layout.preferredWidth: 140
+                                            model: ["Everyday", "A", "B"]
+                                            currentIndex: Math.max(0, ["Everyday", "A", "B"].indexOf(modelData.day_type || "Everyday"))
+                                            Layout.preferredWidth: 110
                                             Layout.preferredHeight: 38
                                             background: Rectangle { color: "#ffffff"; border.color: "#1e3a5f"; border.width: 1; radius: 4 }
                                             contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 10; font.pixelSize: 13 }
@@ -600,7 +662,7 @@ Dialog {
                                     font.pixelSize: 11 }
                             }
                             Label {
-                                text: "Each block you create appears below. Type names comma-separated or import CSV. Roster shown on main screen is the active block’s roster based on current time + A/B day."
+                                text: "Each block shows 3 rosters: Everyday (daily) and A/B (for alternating days from your calendar). Same block, different kids on A vs B. Import adds to the selected variant."
                                 color: "#475569"
                                 wrapMode: Text.WordWrap
                                 Layout.fillWidth: true
@@ -622,10 +684,10 @@ Dialog {
                             model: backend.blocks
                             delegate: Rectangle {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 168
+                                Layout.preferredHeight: 210
                                 radius: 6
                                 color: "#ffffff"
-                                border.color: modelData.day_type === "A" ? "#1e3a5f" : modelData.day_type === "B" ? "#7f1d1d" : modelData.day_type === "Late Start" ? "#7c3aed" : modelData.day_type === "Early Dismissal" ? "#ea580c" : modelData.day_type === "PowerHour" ? "#ca8a04" : "#d1d5db"
+                                border.color: modelData.day_type === "A" ? "#1e3a5f" : modelData.day_type === "B" ? "#7f1d1d" : "#d1d5db"
                                 border.width: 2
                                 ColumnLayout {
                                     anchors.fill: parent
@@ -644,7 +706,7 @@ Dialog {
                                         spacing: 10
                                         Layout.fillWidth: true
                                         Rectangle {
-                                            color: modelData.day_type === "A" ? "#1e3a5f" : modelData.day_type === "B" ? "#7f1d1d" : "#1e293b"
+                                            color: modelData.day_type === "A" ? "#1e3a5f" : modelData.day_type === "B" ? "#7f1d1d" : "#334155"
                                             radius: 6
                                             border.color: modelData.day_type === "A" ? "#1e3a5f" : modelData.day_type === "B" ? "#991b1b" : "#334155"
                                             border.width: 1
@@ -672,13 +734,42 @@ Dialog {
                                             Label { anchors.centerIn: parent; text: (backend.flatRosters[modelData.name] ? backend.flatRosters[modelData.name].length : 0) + " students"; color: "#1e293b"; font.pixelSize: 11; font.bold: true; elide: Text.ElideRight }
                                         }
                                     }
+                                    RowLayout {
+                                        spacing: 6
+                                        Layout.fillWidth: true
+                                        Label { text: "Roster:"; color: "#334155"; font.pixelSize: 11; font.bold: true }
+                                        ComboBox {
+                                            id: variantBox
+                                            model: ["Everyday", "A", "B"]
+                                            currentIndex: 0
+                                            Layout.preferredWidth: 110
+                                            Layout.preferredHeight: 30
+                                            background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 }
+                                            contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 11; font.bold: true }
+                                            onCurrentTextChanged: {
+                                                var t = backend.getRosterForBlockVariant(modelData.name, currentText)
+                                                rosterField.originalText = t
+                                                rosterField.text = t
+                                                var mm = admin.rosterDirty
+                                                mm[modelData.name + ":" + currentText] = false
+                                                admin.rosterDirty = mm
+                                            }
+                                        }
+                                        Label {
+                                            text: variantBox.currentText === "Everyday" ? "• daily — shows when A/B empty" : variantBox.currentText === "A" ? "• A days from calendar" : "• B days from calendar"
+                                            color: "#64748b"
+                                            font.pixelSize: 10
+                                            Layout.fillWidth: true
+                                            elide: Text.ElideRight
+                                        }
+                                    }
                                     // Row 3: TextField full width — owns its line, no button overlap
                                     TextField {
                                         id: rosterField
                                         objectName: "rosterField"
-                                        property string originalText: backend.flatRosters[modelData.name] ? backend.flatRosters[modelData.name].join(", ") : ""
+                                        property string originalText: backend.getRosterForBlockVariant(modelData.name, variantBox.currentText)
                                         text: originalText
-                                        placeholderText: "Comma separated — e.g., Alex Johnson, Sam Rivera"
+                                        placeholderText: variantBox.currentText === "Everyday" ? "Everyday roster — e.g., Alex, Sam (used when A/B empty)" : variantBox.currentText + " roster — e.g., Alex for " + variantBox.currentText
                                         color: "#1e293b"
                                         placeholderTextColor: "#64748b"
                                         background: Rectangle { color: rosterField.text !== rosterField.originalText ? "#fef3c7" : "#ffffff"; border.color: rosterField.text !== rosterField.originalText ? "#f59e0b" : "#d1d5db"; radius: 4; border.width: rosterField.text !== rosterField.originalText ? 2 : 1 }
@@ -687,12 +778,12 @@ Dialog {
                                         font.pixelSize: 12
                                         onTextChanged: {
                                             var m = admin.rosterDirty
-                                            m[modelData.name] = (text !== originalText)
+                                            m[modelData.name + ":" + variantBox.currentText] = (text !== originalText)
                                             admin.rosterDirty = m
                                         }
                                         Component.onCompleted: {
                                             var m = admin.rosterDirty
-                                            m[modelData.name] = false
+                                            m[modelData.name + ":" + variantBox.currentText] = false
                                             admin.rosterDirty = m
                                         }
                                     }
@@ -712,13 +803,13 @@ Dialog {
                                             text: "Save Roster"
                                             Layout.fillWidth: true
                                             Layout.preferredHeight: 36
-                                            background: Rectangle { color: modelData.day_type === "B" ? "#991b1b" : modelData.day_type === "Late Start" ? "#7c3aed" : modelData.day_type === "Early Dismissal" ? "#ea580c" : modelData.day_type === "PowerHour" ? "#a16207" : "#1e3a5f"; radius: 4 }
+                                            background: Rectangle { color: "#1e3a5f"; radius: 4 }
                                             contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 11 }
                                             onClicked: {
-                                                if (backend.setRosterForBlock(modelData.name, rosterField.text)) {
+                                                if (backend.setRosterForBlockVariant(modelData.name, variantBox.currentText, rosterField.text)) {
                                                     rosterField.originalText = rosterField.text
                                                     var m = admin.rosterDirty
-                                                    m[modelData.name] = false
+                                                    m[modelData.name + ":" + variantBox.currentText] = false
                                                     admin.rosterDirty = m
                                                 }
                                             }
@@ -737,7 +828,7 @@ Dialog {
                                             Layout.preferredHeight: 36
                                             background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#991b1b"; border.width: 1 }
                                             contentItem: Text { text: parent.text; color: "#991b1b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 11 }
-                                            onClicked: deleteConfirmDialog.blockName = modelData.name; deleteConfirmDialog.open()
+                                            onClicked: { deleteConfirmDialog.blockName = modelData.name; deleteConfirmDialog.open() }
                                         }
                                     }
                                     Label {
@@ -763,6 +854,18 @@ Dialog {
                                 admin.rosterDirty = m
                             }
                         }
+                    }
+                    FileDialog {
+                        id: calendarCsvDialog
+                        title: "Select Calendar CSV (date,type)"
+                        nameFilters: ["CSV files (*.csv)"]
+                        onAccepted: backend.importDateOverrides(selectedFile, "csv")
+                    }
+                    FileDialog {
+                        id: calendarIcsDialog
+                        title: "Select Calendar ICS"
+                        nameFilters: ["ICS files (*.ics)"]
+                        onAccepted: backend.importDateOverrides(selectedFile, "ics")
                     }
                     Dialog {
                         id: deleteConfirmDialog

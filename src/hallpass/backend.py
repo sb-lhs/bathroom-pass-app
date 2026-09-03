@@ -293,6 +293,14 @@ class Backend(QObject):
             return {"Regular": []}
 
     @Property("QVariantMap", notify=scheduleChanged)  # type: ignore
+    def weekdayTemplates(self) -> dict:
+        try:
+            from .schedules import get_weekday_templates
+            return get_weekday_templates()
+        except Exception:
+            return {}
+
+    @Property("QVariantMap", notify=scheduleChanged)  # type: ignore
     def dateOverrides(self) -> dict:
         try:
             return get_date_overrides()
@@ -576,6 +584,16 @@ class Backend(QObject):
                 simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [],
             )
             save_config(self.cfg)
+            if bool(enabled):
+                try:
+                    from .schedules import get_templates, set_templates
+                    t = get_templates()
+                    if "Simple" not in t:
+                        t["Simple"] = [{"name": "Simple", "start": "00:00", "end": "23:59"}]
+                        set_templates(t)
+                    self.scheduleChanged.emit()
+                except Exception:
+                    pass
             self._resolve_block()
             self._update_roster_cache()
             self.configChanged.emit()
@@ -684,6 +702,20 @@ class Backend(QObject):
                 self.scheduleChanged.emit()
                 return True
             return False
+        except Exception:
+            return False
+
+    @Slot(str, str, result=bool)
+    def setWeekdayTemplate(self, weekday: str, template: str) -> bool:
+        try:
+            from .schedules import set_weekday_template
+            set_weekday_template(weekday, template)
+            self.scheduleChanged.emit()
+            self._resolve_block()
+            self._update_roster_cache()
+            self.activeBlockChanged.emit(self._block_id)
+            self.rosterChanged.emit()
+            return True
         except Exception:
             return False
 
