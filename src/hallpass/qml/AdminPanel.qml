@@ -14,6 +14,8 @@ Dialog {
     property string mode: "admin"
     property string currentTab: "Schedules"
     property string pendingRosterBlock: ""
+    onClosed: backend.logoutAdmin()
+    onVisibleChanged: if (!visible) backend.logoutAdmin()
 
     background: Rectangle {
         color: "#f5f3ef"
@@ -337,8 +339,8 @@ Dialog {
                                     Layout.preferredWidth: 85
                                     font.pixelSize: 13 }
                                         ComboBox {
-                                            model: ["A", "B"]
-                                            currentIndex: (backend.dayDefaults[modelData] || "A") === "B" ? 1 : 0
+                                            model: ["A", "B", "Late Start", "Early Dismissal", "PowerHour"]
+                                            currentIndex: Math.max(0, ["A", "B", "Late Start", "Early Dismissal", "PowerHour"].indexOf(backend.dayDefaults[modelData] || "A"))
                                             onActivated: backend.setDayDefault(modelData, currentText)
                                             Layout.preferredWidth: 170
                                             Layout.preferredHeight: 36
@@ -354,26 +356,29 @@ Dialog {
                     // Add Block card
                     Rectangle {
                         Layout.fillWidth: true
-                        radius: 4
+                        Layout.preferredHeight: 170
+                        radius: 6
                         color: "#ffffff"
                         border.color: "#1e3a5f"
+                        border.width: 2
                         ColumnLayout {
                             anchors.fill: parent
                             anchors.margins: 16
-                            spacing: 12
+                            spacing: 10
                             RowLayout {
                                 spacing: 8
                                 Layout.fillWidth: true
-                                Label { text: "Add New Block"
+                                Rectangle { color: "#1e3a5f"; radius: 4; Layout.preferredWidth: 4; Layout.preferredHeight: 16 }
+                                Label { text: "Create New Block"
                                     color: "#1e3a5f"
                                     font.bold: true
-                                    font.pixelSize: 14
+                                    font.pixelSize: 15
                                     Layout.fillWidth: true }
                                 Label { text: backend.blocks.length + " blocks"
                                     color: "#475569"
                                     font.pixelSize: 11 }
                             }
-                            Label { text: "Name it anything (e.g., ‘Period 1’, ‘PE’, ‘Assembly’). Times are HH:MM 24h. Day type: Everyday = daily, A/B = only on that letter day."
+                            Label { text: "Name, times (HH:MM 24h), and schedule: Everyday = daily, A/B = alternating, plus Late Start / Early Dismissal / PowerHour."
                                     color: "#475569"
                                     wrapMode: Text.WordWrap
                                     Layout.fillWidth: true
@@ -381,24 +386,23 @@ Dialog {
                             RowLayout {
                                 spacing: 10
                                 Layout.fillWidth: true
-                                TextField { id: newName; placeholderText: "Block name"; color: "#1e293b"; placeholderTextColor: "#64748b"; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } Layout.preferredWidth: 200; Layout.preferredHeight: 38; font.pixelSize: 13 }
+                                TextField { id: newName; placeholderText: "Block name (e.g., Period 1)"; color: "#1e293b"; placeholderTextColor: "#64748b"; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } Layout.preferredWidth: 200; Layout.preferredHeight: 38; font.pixelSize: 13 }
                                 TextField { id: newStart; placeholderText: "Start 08:00"; text: "08:00"; color: "#1e293b"; placeholderTextColor: "#64748b"; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } Layout.preferredWidth: 110; Layout.preferredHeight: 38; font.pixelSize: 13 }
                                 Label { text: "→"; color: "#475569"; font.pixelSize: 16 }
                                 TextField { id: newEnd; placeholderText: "End 09:30"; text: "09:30"; color: "#1e293b"; placeholderTextColor: "#64748b"; background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } Layout.preferredWidth: 110; Layout.preferredHeight: 38; font.pixelSize: 13 }
-                                ComboBox { id: newDayType; model: ["Everyday", "A", "B"]; Layout.preferredWidth: 120; Layout.preferredHeight: 38; background: Rectangle { color: "#ffffff"; border.color: "#1e3a5f"; border.width: 1; radius: 4 } contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 10; font.pixelSize: 13 } }
+                                ComboBox { id: newDayType; model: ["Everyday", "A", "B", "Late Start", "Early Dismissal", "PowerHour"]; Layout.preferredWidth: 140; Layout.preferredHeight: 38; background: Rectangle { color: "#ffffff"; border.color: "#1e3a5f"; border.width: 1; radius: 4 } contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 10; font.pixelSize: 13 } }
                                 Button {
-                                    text: "Add Block"
+                                    text: "Create Block"
                                     Layout.preferredHeight: 38
-                                    Layout.preferredWidth: 110
+                                    Layout.preferredWidth: 120
                                     background: Rectangle { color: "#14532d"; radius: 4 }
-                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 13 }
                                     onClicked: {
                                         if (backend.addBlock(newName.text, newStart.text, newEnd.text, newDayType.currentText)) {
                                             newName.text = ""; newStart.text="08:00"; newEnd.text="09:30"
                                         }
                                     }
                                 }
-                                Item { Layout.fillWidth: true }
                             }
                             Label { text: backend.rosterImportStatus; color: backend.rosterImportStatus.indexOf("already exists")>=0 || backend.rosterImportStatus.indexOf("failed")>=0 ? "#991b1b" : "#14532d"; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 11; visible: backend.rosterImportStatus !== "" && admin.currentTab==="Schedules" }
                         }
@@ -476,9 +480,9 @@ Dialog {
                                         }
                                         ComboBox {
                                             id: editDay
-                                            model: ["Everyday", "A", "B"]
-                                            currentIndex: modelData.day_type === "B" ? 2 : modelData.day_type === "A" ? 1 : 0
-                                            Layout.preferredWidth: 128
+                                            model: ["Everyday", "A", "B", "Late Start", "Early Dismissal", "PowerHour"]
+                                            currentIndex: Math.max(0, ["Everyday", "A", "B", "Late Start", "Early Dismissal", "PowerHour"].indexOf(modelData.day_type || "Everyday"))
+                                            Layout.preferredWidth: 140
                                             Layout.preferredHeight: 38
                                             background: Rectangle { color: "#ffffff"; border.color: "#1e3a5f"; border.width: 1; radius: 4 }
                                             contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 10; font.pixelSize: 13 }

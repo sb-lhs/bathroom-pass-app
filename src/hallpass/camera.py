@@ -21,47 +21,75 @@ class SilentCamera:
         if warm:
             self.warm()
 
-    def available_indices(self, max_probe: int = 4) -> list[int]:
-        if self._available_indices is not None:
-            return self._available_indices
+    def available_indices(self, max_probe: int = 6) -> list[int]:
+        # Probe /dev/video* existence first on Linux for faster, permission-aware detection
         found: list[int] = []
         try:
             import cv2  # type: ignore
-            for idx in range(max_probe):
+            from pathlib import Path as _P
+            # Prefer probing only existing /dev/video* nodes on Linux
+            probe_range = range(max_probe)
+            if sys.platform.startswith("linux"):
+                try:
+                    vdevs = sorted(_P("/dev").glob("video*"))
+                    if vdevs:
+                        probe_range = [int(p.name.replace("video", "")) for p in vdevs if p.name.replace("video", "").isdigit()]
+                        probe_range = [i for i in probe_range if i < max_probe]
+                except Exception:
+                    pass
+            for idx in probe_range:
                 cap = None
-                if sys.platform.startswith("linux"):
-                    cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
-                elif sys.platform == "darwin" and hasattr(cv2, "CAP_AVFOUNDATION"):
-                    cap = cv2.VideoCapture(idx, cv2.CAP_AVFOUNDATION)
-                else:
-                    cap = cv2.VideoCapture(idx)
-                if cap and cap.isOpened():
-                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                    ret, frame = cap.read()
-                    if ret and frame is not None:
-                        found.append(idx)
-                    cap.release()
-                elif cap:
-                    cap.release()
+                try:
+                    if sys.platform.startswith("linux"):
+                        cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
+                    elif sys.platform == "darwin" and hasattr(cv2, "CAP_AVFOUNDATION"):
+                        cap = cv2.VideoCapture(idx, cv2.CAP_AVFOUNDATION)
+                    else:
+                        cap = cv2.VideoCapture(idx)
+                    if cap and cap.isOpened():
+                        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                        # Try up to 3 reads to get past initial black frames
+                        ok = False
+                        for _ in range(3):
+                            ret, frame = cap.read()
+                            if ret and frame is not None and getattr(frame, "size", 0) > 0:
+                                ok = True
+                                break
+                        if ok:
+                            found.append(idx)
+                        cap.release()
+                    elif cap:
+                        cap.release()
+                except Exception:
+                    try:
+                        if cap:
+                            cap.release()
+                    except Exception:
+                        pass
         except Exception:
             pass
         if not found:
             found = [self._camera_index]
-        self._available_indices = found
+        # Don't cache permanently — re-probe next time if we fell back
+        if len(found) == 1 and found[0] == self._camera_index and self._available_indices is None:
+            # Cache only if we actually probed devices
+            self._available_indices = found
+        elif found:
+            self._available_indices = found
         return found
 
     def capture_all(self, suffix: str = "out", student: str = "", block: str = "") -> list[str]:
         paths: list[str] = []
-        for idx in self.available_indices():
-            cam_suffix = f"{suffix}_cam{idx}" if len(self.available_indices()) > 1 else suffix
+        indices = self.available_indices()
+        for idx in indices:
+            cam_suffix = f"{suffix}_cam{idx}" if len(indices) > 1 else suffix
             orig_idx = self._camera_index
             self._camera_index = idx
+            # Clear per-camera warm cache so each index gets fresh attempt
             p = self.capture(cam_suffix, student, block)
             self._camera_index = orig_idx
-            if p and not p.endswith("_placeholder"):
-                paths.append(p)
-            elif p:
+            if p:
                 paths.append(p)
         return paths
 
@@ -118,7 +146,7 @@ class SilentCamera:
             # Use kept-open stream first (instant)
             if cap is not None and cap.isOpened():
                 ret, frame = cap.read()
-                if ret and frame is not None and getattr(frame, "mean", lambda: 0)() > 5:
+                if ret and frame is not None and getattr(frame, "size", 0) > 0:
                     cv2.imwrite(str(target), frame)
                     if target.exists() and target.stat().st_size > 1000:
                         return True
@@ -133,7 +161,7 @@ class SilentCamera:
                 fresh.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
                 ret, frame = fresh.read()
                 fresh.release()
-                if ret and frame is not None and frame.mean() > 5:
+                if ret and frame is not None and getattr(frame, "size", 0) > 0:
                     cv2.imwrite(str(target), frame)
                     if target.exists() and target.stat().st_size > 1000:
                         # Re-warm for next shot

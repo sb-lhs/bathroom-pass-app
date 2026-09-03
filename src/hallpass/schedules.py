@@ -24,7 +24,7 @@ from .config import schedules_path
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
-DAY_TYPES = ["Everyday", "A", "B"]
+DAY_TYPES = ["Everyday", "A", "B", "Late Start", "Early Dismissal", "PowerHour"]
 
 
 @dataclass
@@ -44,8 +44,13 @@ def _norm_day_type(v: Any) -> str:
     v = v.strip()
     if v in DAY_TYPES:
         return v
-    # Legacy: Block_A_Schedule -> A, Block_B_Schedule -> B, Assembly -> Everyday, "A Day" -> A etc.
     low = v.lower()
+    if "late" in low:
+        return "Late Start"
+    if "early" in low:
+        return "Early Dismissal"
+    if "power" in low:
+        return "PowerHour"
     if "block_a" in low or low == "a" or "a day" in low:
         return "A"
     if "block_b" in low or low == "b" or "b day" in low:

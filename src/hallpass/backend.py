@@ -488,7 +488,7 @@ class Backend(QObject):
                 self._roster_import_status = "Use HH:MM (e.g., 08:00)"
                 self.rosterImportStatusChanged.emit(self._roster_import_status)
                 return False
-            dt = day_type if day_type in ("Everyday", "A", "B") else "Everyday"
+            dt = day_type if day_type in ("Everyday", "A", "B", "Late Start", "Early Dismissal", "PowerHour") else "Everyday"
             blocks.append({"name": name, "start": start.strip(), "end": end.strip(), "day_type": dt})
             data["blocks"] = blocks
             save_schedules(data)
@@ -527,7 +527,7 @@ class Backend(QObject):
                 self._roster_import_status = f"Block '{new_name}' already exists"
                 self.rosterImportStatusChanged.emit(self._roster_import_status)
                 return False
-            dt = day_type if day_type in ("Everyday", "A", "B") else "Everyday"
+            dt = day_type if day_type in ("Everyday", "A", "B", "Late Start", "Early Dismissal", "PowerHour") else "Everyday"
             blocks[idx] = {"name": new_name, "start": start.strip(), "end": end.strip(), "day_type": dt}
             data["blocks"] = blocks
             save_schedules(data)
@@ -665,6 +665,14 @@ class Backend(QObject):
         self._is_admin = ok
         self.configChanged.emit()
         return ok
+
+    @Slot()
+    def logoutAdmin(self) -> None:
+        self._is_admin = False
+        self._password_status = ""
+        try: self.passwordStatusChanged.emit(self._password_status)
+        except Exception: pass
+        self.configChanged.emit()
 
     @Slot(str, str, str)
     def importRoster(self, file_url: str, block_id: str, profile: str) -> None:
