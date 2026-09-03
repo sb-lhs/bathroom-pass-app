@@ -27,6 +27,7 @@ EOF
   fi
   chmod 666 /etc/hallpass/config.json || true
 fi
+chmod 666 /etc/hallpass/config.json 2>/dev/null || true
 chmod 666 /etc/hallpass/schedules.json 2>/dev/null || true
 chmod 666 /etc/hallpass/rosters.json 2>/dev/null || true
 if ! python3 -c "import PySide6, cv2" 2>/dev/null; then
