@@ -1,0 +1,36 @@
+{
+  "profiles": {
+    "Block_A_Schedule": {
+      "periods": [
+        {"block_id": "Block_1", "start": "08:00", "end": "09:30"},
+        {"block_id": "Block_2", "start": "09:35", "end": "11:05"},
+        {"block_id": "Block_3", "start": "11:10", "end": "12:40"},
+        {"block_id": "Block_4", "start": "13:10", "end": "14:40"}
+      ]
+    },
+    "Block_B_Schedule": {
+      "periods": [
+        {"block_id": "Block_1", "start": "08:00", "end": "09:30"},
+        {"block_id": "Block_2", "start": "09:35", "end": "11:05"},
+        {"block_id": "Block_3", "start": "11:10", "end": "12:40"},
+        {"block_id": "Block_4", "start": "13:10", "end": "14:40"}
+      ]
+    },
+    "Assembly": {
+      "periods": [
+        {"block_id": "Block_1", "start": "08:00", "end": "09:00"},
+        {"block_id": "Assembly", "start": "09:05", "end": "10:00"},
+        {"block_id": "Block_2", "start": "10:05", "end": "11:35"}
+      ]
+    }
+  },
+  "day_defaults": {
+    "Monday": "Block_A_Schedule",
+    "Tuesday": "Block_A_Schedule",
+    "Wednesday": "Block_A_Schedule",
+    "Thursday": "Block_B_Schedule",
+    "Friday": "Block_B_Schedule",
+    "Saturday": "Block_A_Schedule",
+    "Sunday": "Block_A_Schedule"
+  }
+}

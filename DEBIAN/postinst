@@ -1,0 +1,36 @@
+#!/bin/bash
+set -e
+# Create system dirs
+mkdir -p /etc/hallpass
+mkdir -p /var/lib/hallpass/photos
+chmod 755 /etc/hallpass
+chmod 755 /var/lib/hallpass
+# Install defaults if missing
+if [ ! -f /etc/hallpass/config.json ]; then
+  cat > /etc/hallpass/config.json <<'EOF'
+{
+  "bathroom_threshold_seconds": 420,
+  "water_threshold_seconds": 180,
+  "admin_password_hash": "3172b94d2710d7ca55abb3a06a83b09991984aff0ee205b4b61ea51a6ea4d609",
+  "salt": "hallpass_secure_salt",
+  "selected_alarm_sound": "classic_chime.wav",
+  "tts_enabled": true,
+  "active_schedule_profile_override": null
+}
+EOF
+fi
+if [ ! -f /etc/hallpass/schedules.json ]; then
+  cp /usr/share/hallpass/default_schedules.json /etc/hallpass/schedules.json || true
+fi
+if [ ! -f /etc/hallpass/rosters.json ]; then
+  cp /usr/share/hallpass/default_rosters.json /etc/hallpass/rosters.json || true
+fi
+if [ ! -f /var/lib/hallpass/pass_history.csv ]; then
+  echo "Student Name,Block ID,Pass Type,Time Out,Time In,Duration (Minutes),Overtime Status,Photo Out Path,Photo In Path" > /var/lib/hallpass/pass_history.csv
+fi
+# Ensure permissions
+chmod 666 /var/lib/hallpass/pass_history.csv || true
+chmod 666 /var/lib/hallpass/logs.db || true
+chmod 777 /var/lib/hallpass/photos || true
+echo "hallpass-qt installed. Launch with: hallpass-qt"
+exit 0

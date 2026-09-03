@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Hall Pass Kiosk
+Comment=Classroom Bathroom & Water Pass System
+Exec=/usr/bin/hallpass-qt
+Icon=hallpass-qt
+Terminal=false
+Type=Application
+Categories=Education;
+StartupNotify=true

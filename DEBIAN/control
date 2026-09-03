@@ -1,0 +1,10 @@
+Package: hallpass-qt
+Version: 0.1.0
+Section: education
+Priority: optional
+Architecture: amd64
+Maintainer: Hallpass Team <support@example.com>
+Depends: python3, python3-pyside6, python3-opencv, speech-dispatcher, espeak-ng, libqt6texttospeech6, sqlite3, x11-xserver-utils, qml-module-qtquick-controls2, qml-module-qtquick-layouts
+Description: Native Touchscreen Bathroom & Water Pass System
+ Lightweight offline PySide6/QtQuick kiosk for classroom pass management
+ with dual timers, queue, TTS, silent photo audit and USB export.
