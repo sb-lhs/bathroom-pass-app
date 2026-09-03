@@ -52,7 +52,7 @@ class Backend(QObject):
         super().__init__()
         self.cfg: AppConfig = load_config()
         self.storage = Storage()
-        self.camera = SilentCamera(warm=True)
+        self.camera = SilentCamera(warm=True, camera_index=int(getattr(self.cfg, "selected_camera_index", 0)))
         self.alarm = AlarmService()
         self.tts = TTSService()
         self.alarm.set_sound(self.cfg.selected_alarm_sound)
@@ -576,24 +576,21 @@ class Backend(QObject):
         self._resolve_block()
         self._update_roster_cache()
         pt = PassType.Water if pass_type == "Water" else PassType.Bathroom
-        photos = self.camera.capture_all("out", student=name, block=self._block_id or "NoBlock")
-        photo = photos[0] if photos else ""
+        photo = self.camera.capture("out", student=name, block=self._block_id or "NoBlock")
         ok = self.sm.select_student(name, pt, photo)
         if ok:
             self._elapsed = 0
             self.stateChanged.emit(self.sm.state.value)
             self.elapsedChanged.emit(self._elapsed)
             self.queueChanged.emit()
-            if len(photos) > 1:
-                self.photosChanged.emit()
+            self.photosChanged.emit()
 
     @Slot(str, str)
     def enqueue(self, name: str, pass_type: str) -> None:
         self._resolve_block()
         self._update_roster_cache()
         pt = PassType.Water if pass_type == "Water" else PassType.Bathroom
-        photos = self.camera.capture_all("out", student=name, block=self._block_id or "NoBlock")
-        photo = photos[0] if photos else ""
+        photo = self.camera.capture("out", student=name, block=self._block_id or "NoBlock")
         if self.sm.enqueue(name, pt, photo):
             self.queueChanged.emit()
             self.photosChanged.emit()
@@ -604,16 +601,14 @@ class Backend(QObject):
         active_name = self.sm.active.student_name if self.sm.active else ""
         active_block = self.sm.active.block_id if self.sm.active else self._block_id
         # Don't re-resolve here — use the block the pass was started in
-        photos_in = self.camera.capture_all("in", student=active_name, block=active_block or "NoBlock")
-        photo_in = photos_in[0] if photos_in else ""
+        photo_in = self.camera.capture("in", student=active_name, block=active_block or "NoBlock")
         rec = self.sm.return_pass(photo_in)
         self._elapsed = 0
         self.stateChanged.emit(self.sm.state.value)
         self.elapsedChanged.emit(self._elapsed)
         self.queueChanged.emit()
         self.historyChanged.emit()
-        if len(photos_in) > 1:
-            self.photosChanged.emit()
+        self.photosChanged.emit()
 
     @Slot()
     def muteAlarm(self) -> None:
@@ -674,6 +669,76 @@ class Backend(QObject):
         except Exception: pass
         self.configChanged.emit()
 
+    @Property(int, notify=configChanged)  # type: ignore
+    def selectedCameraIndex(self) -> int:
+        return int(getattr(self.cfg, "selected_camera_index", 0))
+
+    @Property(list, notify=configChanged)  # type: ignore
+    def availableCameraIndices(self) -> list[int]:
+        try:
+            return self.camera.available_indices(force_probe=True)
+        except Exception:
+            return [0]
+
+    @Slot(int, result=bool)
+    def setSelectedCameraIndex(self, idx: int) -> bool:
+        try:
+            idx = int(idx)
+            self.cfg = AppConfig(
+                bathroom_threshold_seconds=self.cfg.bathroom_threshold_seconds,
+                water_threshold_seconds=self.cfg.water_threshold_seconds,
+                admin_password_hash=self.cfg.admin_password_hash,
+                salt=self.cfg.salt,
+                selected_alarm_sound=self.cfg.selected_alarm_sound,
+                tts_enabled=self.cfg.tts_enabled,
+                active_schedule_profile_override=self.cfg.active_schedule_profile_override,
+                first_run=self.cfg.first_run,
+                default_admin_pass=self.cfg.default_admin_pass,
+                selected_camera_index=idx,
+                camera_picker_shown=True,
+            )
+            save_config(self.cfg)
+            # Update camera
+            try:
+                self.camera._camera_index = idx
+                self.camera._available_indices = [idx]
+                self.camera.warm()
+            except Exception:
+                pass
+            self.configChanged.emit()
+            return True
+        except Exception:
+            return False
+
+    @Slot(result=bool)
+    def markCameraPickerShown(self) -> bool:
+        try:
+            self.cfg = AppConfig(
+                bathroom_threshold_seconds=self.cfg.bathroom_threshold_seconds,
+                water_threshold_seconds=self.cfg.water_threshold_seconds,
+                admin_password_hash=self.cfg.admin_password_hash,
+                salt=self.cfg.salt,
+                selected_alarm_sound=self.cfg.selected_alarm_sound,
+                tts_enabled=self.cfg.tts_enabled,
+                active_schedule_profile_override=self.cfg.active_schedule_profile_override,
+                first_run=self.cfg.first_run,
+                default_admin_pass=self.cfg.default_admin_pass,
+                selected_camera_index=self.cfg.selected_camera_index,
+                camera_picker_shown=True,
+            )
+            save_config(self.cfg)
+            self.configChanged.emit()
+            return True
+        except Exception:
+            return False
+
+    @Property(bool, notify=configChanged)  # type: ignore
+    def needsCameraPicker(self) -> bool:
+        try:
+            return not bool(getattr(self.cfg, "camera_picker_shown", False)) and len(self.camera.available_indices()) > 1
+        except Exception:
+            return False
+
     @Slot(str, str, str)
     def importRoster(self, file_url: str, block_id: str, profile: str) -> None:
         # Legacy compat: ignore profile, use block_id as block name
@@ -720,6 +785,8 @@ class Backend(QObject):
             selected_alarm_sound=name,
             tts_enabled=self.cfg.tts_enabled,
             active_schedule_profile_override=self.cfg.active_schedule_profile_override,
+            selected_camera_index=self.cfg.selected_camera_index,
+            camera_picker_shown=self.cfg.camera_picker_shown,
         )
         save_config(self.cfg)
         self.sm.cfg = self.cfg
@@ -751,6 +818,8 @@ class Backend(QObject):
             selected_alarm_sound=self.cfg.selected_alarm_sound,
             tts_enabled=enabled,
             active_schedule_profile_override=self.cfg.active_schedule_profile_override,
+            selected_camera_index=self.cfg.selected_camera_index,
+            camera_picker_shown=self.cfg.camera_picker_shown,
         )
         save_config(self.cfg)
         self.sm.cfg = self.cfg
@@ -768,6 +837,8 @@ class Backend(QObject):
                 selected_alarm_sound=self.cfg.selected_alarm_sound,
                 tts_enabled=self.cfg.tts_enabled,
                 active_schedule_profile_override=self.cfg.active_schedule_profile_override,
+                selected_camera_index=self.cfg.selected_camera_index,
+                camera_picker_shown=self.cfg.camera_picker_shown,
             )
         else:
             new_val = max(60, self.cfg.water_threshold_seconds + delta)
@@ -779,6 +850,8 @@ class Backend(QObject):
                 selected_alarm_sound=self.cfg.selected_alarm_sound,
                 tts_enabled=self.cfg.tts_enabled,
                 active_schedule_profile_override=self.cfg.active_schedule_profile_override,
+                selected_camera_index=self.cfg.selected_camera_index,
+                camera_picker_shown=self.cfg.camera_picker_shown,
             )
         save_config(self.cfg)
         self.sm.cfg = self.cfg
@@ -819,6 +892,8 @@ class Backend(QObject):
             selected_alarm_sound=self.cfg.selected_alarm_sound,
             tts_enabled=self.cfg.tts_enabled,
             active_schedule_profile_override=letter,
+            selected_camera_index=self.cfg.selected_camera_index,
+            camera_picker_shown=self.cfg.camera_picker_shown,
         )
         save_config(self.cfg)
         self.sm.cfg = self.cfg

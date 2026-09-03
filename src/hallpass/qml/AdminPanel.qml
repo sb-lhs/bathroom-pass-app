@@ -14,8 +14,21 @@ Dialog {
     property string mode: "admin"
     property string currentTab: "Schedules"
     property string pendingRosterBlock: ""
+    property string pendingTab: ""
+    property bool pendingClose: false
+    property var rosterDirty: ({})
     onClosed: backend.logoutAdmin()
     onVisibleChanged: if (!visible) backend.logoutAdmin()
+    function hasUnsavedRosters() {
+        for (var k in rosterDirty) if (rosterDirty[k]) return true
+        return false
+    }
+    function trySwitchTab(newTab) {
+        if (hasUnsavedRosters()) { pendingTab = newTab; unsavedDialog.open() } else { currentTab = newTab }
+    }
+    function tryCloseAdmin() {
+        if (hasUnsavedRosters()) { pendingClose = true; unsavedDialog.open() } else { admin.close() }
+    }
 
     background: Rectangle {
         color: "#f5f3ef"
@@ -190,7 +203,7 @@ Dialog {
                             font.bold: parent.checked
                             font.family: "Libre Baskerville"
                         }
-                        onClicked: admin.currentTab = modelData.key
+                        onClicked: admin.trySwitchTab(modelData.key)
                     }
                 }
                 Item { Layout.fillWidth: true }
@@ -200,7 +213,7 @@ Dialog {
                     Layout.preferredWidth: 100
                     background: Rectangle { color: "#334155"
                                     radius: 4 }
-                    onClicked: admin.close()
+                    onClicked: admin.tryCloseAdmin()
                 }
             }
         }
@@ -559,16 +572,17 @@ Dialog {
                         }
                     }
                     ColumnLayout {
-                        spacing: 16
+                        spacing: 20
                         Layout.fillWidth: true
                         Repeater {
+                            id: rosterRepeater
                             model: backend.blocks
                             delegate: Rectangle {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 140
-                                radius: 4
+                                Layout.preferredHeight: 168
+                                radius: 6
                                 color: "#ffffff"
-                                border.color: modelData.day_type === "A" ? "#1e3a5f" : modelData.day_type === "B" ? "#7f1d1d" : "#d1d5db"
+                                border.color: modelData.day_type === "A" ? "#1e3a5f" : modelData.day_type === "B" ? "#7f1d1d" : modelData.day_type === "Late Start" ? "#7c3aed" : modelData.day_type === "Early Dismissal" ? "#ea580c" : modelData.day_type === "PowerHour" ? "#ca8a04" : "#d1d5db"
                                 border.width: 2
                                 ColumnLayout {
                                     anchors.fill: parent
@@ -618,35 +632,78 @@ Dialog {
                                     // Row 3: TextField full width — owns its line, no button overlap
                                     TextField {
                                         id: rosterField
-                                        text: backend.flatRosters[modelData.name] ? backend.flatRosters[modelData.name].join(", ") : ""
+                                        objectName: "rosterField"
+                                        property string originalText: backend.flatRosters[modelData.name] ? backend.flatRosters[modelData.name].join(", ") : ""
+                                        text: originalText
                                         placeholderText: "Comma separated — e.g., Alex Johnson, Sam Rivera"
                                         color: "#1e293b"
                                         placeholderTextColor: "#64748b"
-                                        background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
+                                        background: Rectangle { color: rosterField.text !== rosterField.originalText ? "#fef3c7" : "#ffffff"; border.color: rosterField.text !== rosterField.originalText ? "#f59e0b" : "#d1d5db"; radius: 4; border.width: rosterField.text !== rosterField.originalText ? 2 : 1 }
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 38
                                         font.pixelSize: 12
+                                        onTextChanged: {
+                                            var m = admin.rosterDirty
+                                            m[modelData.name] = (text !== originalText)
+                                            admin.rosterDirty = m
+                                        }
+                                        Component.onCompleted: {
+                                            var m = admin.rosterDirty
+                                            m[modelData.name] = false
+                                            admin.rosterDirty = m
+                                        }
                                     }
-                                    // Row 4: Buttons each take equal space, no fixed-width crunch
+                                    Label {
+                                        visible: rosterField.text !== rosterField.originalText
+                                        text: "● Unsaved changes"
+                                        color: "#d97706"
+                                        font.pixelSize: 10
+                                        font.bold: true
+                                        Layout.fillWidth: true
+                                    }
+                                    // Row 4: 3 buttons — Save / Import / Delete All (with confirm)
                                     RowLayout {
-                                        spacing: 10
+                                        spacing: 8
                                         Layout.fillWidth: true
                                         Button {
                                             text: "Save Roster"
                                             Layout.fillWidth: true
                                             Layout.preferredHeight: 36
-                                            background: Rectangle { color: modelData.day_type === "B" ? "#991b1b" : "#1e3a5f"; radius: 4 }
-                                            contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
-                                            onClicked: backend.setRosterForBlock(modelData.name, rosterField.text)
+                                            background: Rectangle { color: modelData.day_type === "B" ? "#991b1b" : modelData.day_type === "Late Start" ? "#7c3aed" : modelData.day_type === "Early Dismissal" ? "#ea580c" : modelData.day_type === "PowerHour" ? "#a16207" : "#1e3a5f"; radius: 4 }
+                                            contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 11 }
+                                            onClicked: {
+                                                if (backend.setRosterForBlock(modelData.name, rosterField.text)) {
+                                                    rosterField.originalText = rosterField.text
+                                                    var m = admin.rosterDirty
+                                                    m[modelData.name] = false
+                                                    admin.rosterDirty = m
+                                                }
+                                            }
                                         }
                                         Button {
                                             text: "Import CSV"
                                             Layout.fillWidth: true
                                             Layout.preferredHeight: 36
                                             background: Rectangle { color: "#334155"; radius: 4 }
-                                            contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                            contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 11 }
                                             onClicked: { admin.pendingRosterBlock = modelData.name; rosterFileDialog.open() }
                                         }
+                                        Button {
+                                            text: "Delete All"
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: 36
+                                            background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#991b1b"; border.width: 1 }
+                                            contentItem: Text { text: parent.text; color: "#991b1b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 11 }
+                                            onClicked: deleteConfirmDialog.blockName = modelData.name; deleteConfirmDialog.open()
+                                        }
+                                    }
+                                    Label {
+                                        text: backend.rosterImportStatus
+                                        color: backend.rosterImportStatus.indexOf("failed")>=0 || backend.rosterImportStatus.indexOf("Failed")>=0 ? "#991b1b" : "#14532d"
+                                        font.pixelSize: 10
+                                        wrapMode: Text.WordWrap
+                                        Layout.fillWidth: true
+                                        visible: backend.rosterImportStatus !== "" && backend.rosterImportStatus.indexOf(modelData.name) >= 0
                                     }
                                 }
                             }
@@ -657,7 +714,154 @@ Dialog {
                         title: "Select Roster CSV"
                         nameFilters: ["CSV files (*.csv)"]
                         onAccepted: {
-                            backend.importRosterForBlock(selectedFile, admin.pendingRosterBlock)
+                            if (backend.importRosterForBlock(selectedFile, admin.pendingRosterBlock)) {
+                                var m = admin.rosterDirty
+                                m[admin.pendingRosterBlock] = false
+                                admin.rosterDirty = m
+                            }
+                        }
+                    }
+                    Dialog {
+                        id: deleteConfirmDialog
+                        property string blockName: ""
+                        title: "Delete All?"
+                        modal: true
+                        anchors.centerIn: parent
+                        width: 420
+                        height: 200
+                        standardButtons: Dialog.NoButton
+                        background: Rectangle { color: "#ffffff"; radius: 8; border.color: "#d1d5db" }
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 12
+                            Label { text: "Delete all students from " + deleteConfirmDialog.blockName + "?" ; color: "#1e293b"; font.bold: true; font.pixelSize: 14; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                            Label { text: "This cannot be undone. The block will be empty until you add or import again."; color: "#475569"; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                            RowLayout {
+                                spacing: 12
+                                Layout.fillWidth: true
+                                Button {
+                                    text: "Cancel"
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 44
+                                    background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#d1d5db"; border.width: 1 }
+                                    contentItem: Text { text: parent.text; color: "#1e293b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                                    onClicked: deleteConfirmDialog.close()
+                                }
+                                Button {
+                                    text: "Delete All"
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 44
+                                    background: Rectangle { color: "#991b1b"; radius: 4 }
+                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                                    onClicked: {
+                                        backend.setRosterForBlock(deleteConfirmDialog.blockName, "")
+                                        var m = admin.rosterDirty
+                                        m[deleteConfirmDialog.blockName] = false
+                                        admin.rosterDirty = m
+                                        deleteConfirmDialog.close()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Dialog {
+                        id: unsavedDialog
+                        title: "Unsaved Rosters"
+                        modal: true
+                        anchors.centerIn: parent
+                        width: 460
+                        height: 210
+                        standardButtons: Dialog.NoButton
+                        background: Rectangle { color: "#ffffff"; radius: 8; border.color: "#d1d5db" }
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 12
+                            Label { text: "You have unsaved roster changes."; color: "#1e293b"; font.bold: true; font.pixelSize: 14; Layout.fillWidth: true }
+                            Label { text: "If you leave now, your edits will be lost. Save each roster with Save Roster first."; color: "#475569"; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                            RowLayout {
+                                spacing: 12
+                                Layout.fillWidth: true
+                                Button {
+                                    text: "Stay"
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 44
+                                    background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#d1d5db"; border.width: 1 }
+                                    contentItem: Text { text: parent.text; color: "#1e293b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                                    onClicked: { admin.pendingTab=""; admin.pendingClose=false; unsavedDialog.close() }
+                                }
+                                Button {
+                                    text: "Discard & Leave"
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 44
+                                    background: Rectangle { color: "#991b1b"; radius: 4 }
+                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                                    onClicked: {
+                                        // Clear dirty flags and proceed
+                                        admin.rosterDirty = ({})
+                                        unsavedDialog.close()
+                                        if (admin.pendingClose) { admin.pendingClose=false; admin.pendingTab=""; admin.close() }
+                                        else if (admin.pendingTab !== "") { var t=admin.pendingTab; admin.pendingTab=""; admin.currentTab=t }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Dialog {
+                        id: cameraPickerDialog
+                        title: "Choose Camera — Faces Student at Screen"
+                        modal: true
+                        anchors.centerIn: parent
+                        width: 480
+                        height: 360
+                        standardButtons: Dialog.NoButton
+                        background: Rectangle { color: "#ffffff"; radius: 8; border.color: "#1e3a5f"; border.width: 2 }
+                        visible: backend.needsCameraPicker && admin.visible && backend.isAdminAuthenticated
+                        onVisibleChanged: if (visible) cameraPickerBox.currentIndex = Math.max(0, backend.availableCameraIndices.indexOf(backend.selectedCameraIndex))
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 12
+                            Rectangle { color: "#1e3a5f"; radius: 4; Layout.fillWidth: true; Layout.preferredHeight: 4 }
+                            Label { text: "Multiple cameras found — pick the one facing the student at the screen."; color: "#1e293b"; font.bold: true; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                            Label { text: "This is shown once on first login when multiple cameras exist. Change anytime in Photos → Camera."; color: "#475569"; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                            ComboBox {
+                                id: cameraPickerBox
+                                model: backend ? backend.availableCameraIndices : [0]
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 44
+                                background: Rectangle { color: "#ffffff"; border.color: "#1e3a5f"; border.width: 2; radius: 4 }
+                                contentItem: Text { text: "Camera " + parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 12; font.pixelSize: 14; font.bold: true }
+                            }
+                            RowLayout {
+                                spacing: 12
+                                Layout.fillWidth: true
+                                Button {
+                                    text: "Test"
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 44
+                                    background: Rectangle { color: "#334155"; radius: 4 }
+                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                                    onClicked: { backend.setSelectedCameraIndex(parseInt(cameraPickerBox.currentText)); var p = backend.testCameraCapture(); if (p !== "") backend.refreshPhotos() }
+                                }
+                                Button {
+                                    text: "Use This Camera"
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 44
+                                    background: Rectangle { color: "#14532d"; radius: 4 }
+                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                                    onClicked: { backend.setSelectedCameraIndex(parseInt(cameraPickerBox.currentText)); backend.markCameraPickerShown(); cameraPickerDialog.close() }
+                                }
+                            }
+                            Button {
+                                text: "Skip — Keep Camera " + backend.selectedCameraIndex
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 36
+                                background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#d1d5db"; border.width: 1 }
+                                contentItem: Text { text: parent.text; color: "#475569"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 11 }
+                                onClicked: { backend.markCameraPickerShown(); cameraPickerDialog.close() }
+                            }
                         }
                     }
                 }
@@ -730,7 +934,7 @@ Dialog {
                         }
                         Rectangle {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 92
+                            Layout.preferredHeight: 150
                             radius: 4
                             color: "#fef2f2"
                             border.color: "#fecaca"
@@ -743,13 +947,23 @@ Dialog {
                                     spacing: 6
                                     Layout.fillWidth: true
                                     Label { text: "Camera"; color: "#991b1b"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
-                                    Label { text: "Test real capture"; color: "#7f1d1d"; font.pixelSize: 10 }
+                                    Rectangle { color: backend.selectedCameraIndex !== 0 ? "#7c3aed" : "#1e3a5f"; radius: 4; Layout.preferredWidth: 52; Layout.preferredHeight: 18; Label { anchors.centerIn: parent; text: "cam " + backend.selectedCameraIndex; color: "white"; font.pixelSize: 10; font.bold: true } }
+                                }
+                                ComboBox {
+                                    id: cameraBox
+                                    model: backend ? backend.availableCameraIndices : [0]
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 32
+                                    background: Rectangle { color: "#ffffff"; border.color: "#991b1b"; radius: 4; border.width: 1 }
+                                    contentItem: Text { text: "Camera " + parent.displayText + (parent.displayText == backend.selectedCameraIndex ? " ✓" : ""); color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 10; font.pixelSize: 11 }
+                                    Component.onCompleted: currentIndex = Math.max(0, backend.availableCameraIndices.indexOf(backend.selectedCameraIndex))
+                                    onActivated: backend.setSelectedCameraIndex(parseInt(currentText))
                                 }
                                 RowLayout {
                                     spacing: 8
                                     Layout.fillWidth: true
                                     Button {
-                                        text: "Test Camera"
+                                        text: "Test Selected"
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 30
                                         background: Rectangle { color: "#1e3a5f"; radius: 4 }
@@ -765,7 +979,7 @@ Dialog {
                                         onClicked: backend.openCameraSettings()
                                     }
                                 }
-                                Label { text: "If ‘NO CAMERA’, allow Terminal → relaunch"; color: "#991b1b"; font.pixelSize: 9; Layout.fillWidth: true; wrapMode: Text.WordWrap; elide: Text.ElideRight }
+                                Label { text: "Pick the camera facing the student at the screen. First login shows picker if multiple."; color: "#7f1d1d"; font.pixelSize: 9; Layout.fillWidth: true; wrapMode: Text.WordWrap }
                             }
                         }
                     }

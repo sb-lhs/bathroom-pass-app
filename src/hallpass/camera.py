@@ -21,7 +21,9 @@ class SilentCamera:
         if warm:
             self.warm()
 
-    def available_indices(self, max_probe: int = 6) -> list[int]:
+    def available_indices(self, max_probe: int = 6, force_probe: bool = False) -> list[int]:
+        if not force_probe and self._available_indices is not None:
+            return self._available_indices
         # Probe /dev/video* existence first on Linux for faster, permission-aware detection
         found: list[int] = []
         try:

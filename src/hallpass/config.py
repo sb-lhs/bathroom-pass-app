@@ -115,6 +115,8 @@ class AppConfig:
     active_schedule_profile_override: str | None = None
     first_run: bool = False
     default_admin_pass: str = DEFAULT_ADMIN_PASS
+    selected_camera_index: int = 0
+    camera_picker_shown: bool = False
 
     @staticmethod
     def hash_password(password: str, salt: str | None = None) -> tuple[str, str]:
@@ -163,6 +165,8 @@ class AppConfig:
             active_schedule_profile_override=self.active_schedule_profile_override,
             first_run=False,
             default_admin_pass=self.default_admin_pass,
+            selected_camera_index=self.selected_camera_index,
+            camera_picker_shown=self.camera_picker_shown,
         )
 
 
@@ -197,6 +201,8 @@ def _ensure_config_exists() -> Path:
         "selected_alarm_sound": DEFAULT_ALARM_SOUND,
         "tts_enabled": DEFAULT_TTS_ENABLED,
         "active_schedule_profile_override": None,
+        "selected_camera_index": 0,
+        "camera_picker_shown": False,
     }
     p.write_text(json.dumps(fallback, indent=2), encoding="utf-8")
     return p
@@ -223,6 +229,8 @@ def load_config() -> AppConfig:
             active_schedule_profile_override=raw.get("active_schedule_profile_override"),
             first_run=bool(raw.get("first_run", False)),
             default_admin_pass=str(raw.get("default_admin_pass", DEFAULT_ADMIN_PASS)),
+            selected_camera_index=int(raw.get("selected_camera_index", 0)),
+            camera_picker_shown=bool(raw.get("camera_picker_shown", False)),
         )
     except Exception:
         return AppConfig(first_run=True, default_admin_pass=DEFAULT_ADMIN_PASS)
@@ -260,6 +268,8 @@ def set_initial_admin_password(new_password: str) -> AppConfig:
         active_schedule_profile_override=cfg.active_schedule_profile_override,
         first_run=False,
         default_admin_pass=cfg.default_admin_pass,
+        selected_camera_index=cfg.selected_camera_index,
+        camera_picker_shown=cfg.camera_picker_shown,
     )
     save_config(new_cfg)
     return new_cfg
