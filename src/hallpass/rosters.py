@@ -24,12 +24,7 @@ ALL_PROFILES = [PROFILE_A, PROFILE_B]
 
 
 def default_flat() -> dict[str, list[str]]:
-    return {
-        "Block 1": ["Alex Johnson", "Sam Rivera", "Jordan Lee"],
-        "Block 2": ["Taylor Swift", "Casey Kim"],
-        "Block 3": ["Morgan Park"],
-        "Block 4": ["Riley Quinn"],
-    }
+    return {}
 
 
 def default_rosters() -> dict[str, dict[str, list[str]]]:
@@ -186,14 +181,20 @@ def save_rosters(data: dict[str, Any]) -> None:
         # Save as new flat (per-block)
         cleaned: dict[str, list[str]] = {str(k).strip(): [str(x).strip() for x in v if str(x).strip()] for k, v in data.items() if str(k).strip()}
         p.write_text(json.dumps(cleaned, indent=2), encoding="utf-8")
+        try: import os; os.chmod(p, 0o666)
+        except Exception: pass
         return
     if data and _is_nested(data):
         # Legacy nested: migrate to flat on save for new model
         flat = _migrate_nested_to_flat(data)  # type: ignore
         p.write_text(json.dumps(flat, indent=2), encoding="utf-8")
+        try: import os; os.chmod(p, 0o666)
+        except Exception: pass
         return
     # Fallback
     p.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    try: import os; os.chmod(p, 0o666)
+    except Exception: pass
 
 
 def save_nested(data: dict[str, dict[str, list[str]]]) -> None:

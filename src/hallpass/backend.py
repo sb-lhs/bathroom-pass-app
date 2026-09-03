@@ -45,6 +45,7 @@ class Backend(QObject):
     scheduleChanged = Signal()
     historyChanged = Signal()
     photosChanged = Signal()
+    passwordStatusChanged = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -76,6 +77,7 @@ class Backend(QObject):
         self._export_status = ""
         self._roster_import_status = ""
         self._photos_status = ""
+        self._password_status = ""
         # Auto-purge photos older than 7 days on startup
         try:
             self._purge_old_photos_internal(days=7)
@@ -373,6 +375,10 @@ class Backend(QObject):
     def photosStatus(self) -> str:
         return getattr(self, "_photos_status", "")
 
+    @Property(str, notify=passwordStatusChanged)  # type: ignore
+    def passwordStatus(self) -> str:
+        return getattr(self, "_password_status", "")
+
     @Property(bool, notify=configChanged)  # type: ignore
     def isFirstRun(self) -> bool:
         try:
@@ -598,19 +604,32 @@ class Backend(QObject):
     def setInitialPassword(self, new_password: str, confirm_password: str) -> bool:
         if not new_password or new_password != confirm_password:
             self._is_admin = False
+            self._password_status = "Passwords do not match"
+            try: self.passwordStatusChanged.emit(self._password_status)
+            except Exception: pass
             self.configChanged.emit()
             return False
         if len(new_password) < 4:
             self._is_admin = False
+            self._password_status = "Password must be at least 4 characters"
+            try: self.passwordStatusChanged.emit(self._password_status)
+            except Exception: pass
             self.configChanged.emit()
             return False
         try:
             self.cfg = set_initial_admin_password(new_password)
             self._is_admin = True
+            self._password_status = "Password set"
+            try: self.passwordStatusChanged.emit(self._password_status)
+            except Exception: pass
             self.configChanged.emit()
             return True
-        except Exception:
+        except Exception as e:
+            import traceback; traceback.print_exc()
             self._is_admin = False
+            self._password_status = f"Failed: {e}"
+            try: self.passwordStatusChanged.emit(self._password_status)
+            except Exception: pass
             self.configChanged.emit()
             return False
 

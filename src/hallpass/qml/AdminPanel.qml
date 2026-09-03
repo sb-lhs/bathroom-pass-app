@@ -74,7 +74,7 @@ Dialog {
                 placeholderTextColor: "#64748b"
                 background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
             }
-            Label { id: firstRunError; text: ""; color: "#ef4444"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Label { id: firstRunError; text: backend.passwordStatus; color: backend.passwordStatus === "Password set" ? "#14532d" : "#ef4444"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true; visible: backend.passwordStatus !== "" }
             Button {
                 text: "Set Password & Unlock"
                 Layout.fillWidth: true
@@ -82,13 +82,9 @@ Dialog {
                 contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 14 }
                 background: Rectangle { color: "#1e3a5f"; radius: 4 }
                 onClicked: {
-                    if (newPassField.text.length < 4) { firstRunError.text = "Password must be at least 4 characters"; return }
-                    if (newPassField.text !== confirmPassField.text) { firstRunError.text = "Passwords do not match"; return }
-                    if (backend.setInitialPassword(newPassField.text, confirmPassField.text)) {
-                        firstRunError.text = ""
+                    backend.setInitialPassword(newPassField.text, confirmPassField.text)
+                    if (backend.isAdminAuthenticated) {
                         newPassField.text = ""; confirmPassField.text = ""
-                    } else {
-                        firstRunError.text = "Failed to set password"
                     }
                 }
             }

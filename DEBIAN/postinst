@@ -25,8 +25,10 @@ if [ ! -f /etc/hallpass/config.json ]; then
 }
 EOF
   fi
-  chmod 600 /etc/hallpass/config.json || true
+  chmod 666 /etc/hallpass/config.json || true
 fi
+chmod 666 /etc/hallpass/schedules.json 2>/dev/null || true
+chmod 666 /etc/hallpass/rosters.json 2>/dev/null || true
 if ! python3 -c "import PySide6, cv2" 2>/dev/null; then
   if [ -d /usr/share/hallpass/wheelhouse ] && ls /usr/share/hallpass/wheelhouse/*.whl 1>/dev/null 2>&1; then
     echo "Installing PySide6/opencv from bundled wheelhouse (offline, ~10s)..."

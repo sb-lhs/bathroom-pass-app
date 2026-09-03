@@ -179,9 +179,8 @@ def _ensure_config_exists() -> Path:
             data = json.loads(default_p.read_text(encoding="utf-8"))
             p.write_text(json.dumps(data, indent=2), encoding="utf-8")
             try:
-                # Secure permissions
                 import os as _os
-                _os.chmod(p, 0o600)
+                _os.chmod(p, 0o666)
             except Exception:
                 pass
             return p
@@ -240,7 +239,7 @@ def save_config(cfg: AppConfig) -> None:
     p.write_text(json.dumps(data, indent=2), encoding="utf-8")
     try:
         import os as _os
-        _os.chmod(p, 0o600)
+        _os.chmod(p, 0o666)
     except Exception:
         pass
     data_dir().mkdir(parents=True, exist_ok=True)
