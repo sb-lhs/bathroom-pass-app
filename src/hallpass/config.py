@@ -214,32 +214,59 @@ def _ensure_config_exists() -> Path:
     return p
 
 
+def _parse_raw_config(raw: dict[str, Any]) -> AppConfig:
+    return AppConfig(
+        bathroom_threshold_seconds=int(raw.get("bathroom_threshold_seconds", DEFAULT_BATHROOM_THRESHOLD)),
+        water_threshold_seconds=int(raw.get("water_threshold_seconds", DEFAULT_WATER_THRESHOLD)),
+        admin_password_hash=str(raw.get("admin_password_hash", "")),
+        salt=str(raw.get("salt", "")),
+        selected_alarm_sound=str(raw.get("selected_alarm_sound", DEFAULT_ALARM_SOUND)),
+        tts_enabled=bool(raw.get("tts_enabled", DEFAULT_TTS_ENABLED)),
+        active_schedule_profile_override=raw.get("active_schedule_profile_override"),
+        first_run=bool(raw.get("first_run", False)),
+        default_admin_pass=str(raw.get("default_admin_pass", DEFAULT_ADMIN_PASS)),
+        selected_camera_index=int(raw.get("selected_camera_index", 0)),
+        camera_picker_shown=bool(raw.get("camera_picker_shown", False)),
+        simple_mode=bool(raw.get("simple_mode", False)),
+        simple_roster=list(raw.get("simple_roster", [])),
+    )
+
+
 def load_config() -> AppConfig:
     """Load config from file, returning defaults if missing/corrupt. Handles first-run."""
-    # Test mode: auto-authenticate, don't require file
+    # Test mode: auto-authenticate but PRESERVE persisted fields like simple_mode
     if _is_test_mode():
-        return AppConfig(first_run=False, admin_password_hash="test", salt="test", default_admin_pass=DEFAULT_ADMIN_PASS)
+        p = _ensure_config_exists()
+        if not p.exists():
+            return AppConfig(first_run=False, admin_password_hash="test", salt="test", default_admin_pass=DEFAULT_ADMIN_PASS)
+        try:
+            raw: dict[str, Any] = json.loads(p.read_text(encoding="utf-8"))
+            base = _parse_raw_config(raw)
+            # Override only auth fields for test bypass; keep simple_mode/roster/etc from disk
+            return AppConfig(
+                bathroom_threshold_seconds=base.bathroom_threshold_seconds,
+                water_threshold_seconds=base.water_threshold_seconds,
+                admin_password_hash="test",
+                salt="test",
+                selected_alarm_sound=base.selected_alarm_sound,
+                tts_enabled=base.tts_enabled,
+                active_schedule_profile_override=base.active_schedule_profile_override,
+                first_run=False,
+                default_admin_pass=DEFAULT_ADMIN_PASS,
+                selected_camera_index=base.selected_camera_index,
+                camera_picker_shown=base.camera_picker_shown,
+                simple_mode=base.simple_mode,
+                simple_roster=list(base.simple_roster) if base.simple_roster else [],
+            )
+        except Exception:
+            return AppConfig(first_run=False, admin_password_hash="test", salt="test", default_admin_pass=DEFAULT_ADMIN_PASS)
 
     p = _ensure_config_exists()
     if not p.exists():
         return AppConfig(first_run=True, default_admin_pass=DEFAULT_ADMIN_PASS)
     try:
         raw: dict[str, Any] = json.loads(p.read_text(encoding="utf-8"))
-        return AppConfig(
-            bathroom_threshold_seconds=int(raw.get("bathroom_threshold_seconds", DEFAULT_BATHROOM_THRESHOLD)),
-            water_threshold_seconds=int(raw.get("water_threshold_seconds", DEFAULT_WATER_THRESHOLD)),
-            admin_password_hash=str(raw.get("admin_password_hash", "")),
-            salt=str(raw.get("salt", "")),
-            selected_alarm_sound=str(raw.get("selected_alarm_sound", DEFAULT_ALARM_SOUND)),
-            tts_enabled=bool(raw.get("tts_enabled", DEFAULT_TTS_ENABLED)),
-            active_schedule_profile_override=raw.get("active_schedule_profile_override"),
-            first_run=bool(raw.get("first_run", False)),
-            default_admin_pass=str(raw.get("default_admin_pass", DEFAULT_ADMIN_PASS)),
-            selected_camera_index=int(raw.get("selected_camera_index", 0)),
-            camera_picker_shown=bool(raw.get("camera_picker_shown", False)),
-            simple_mode=bool(raw.get("simple_mode", False)),
-            simple_roster=list(raw.get("simple_roster", [])),
-        )
+        return _parse_raw_config(raw)
     except Exception:
         return AppConfig(first_run=True, default_admin_pass=DEFAULT_ADMIN_PASS)
 
