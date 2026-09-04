@@ -368,7 +368,7 @@ Dialog {
                     }
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 340
+                        Layout.preferredHeight: 460
                         radius: 4
                         color: "#ffffff"
                         border.color: "#d1d5db"
@@ -376,36 +376,49 @@ Dialog {
                             anchors.fill: parent
                             anchors.margins: 16
                             spacing: 10
-                            Label { text: "Weekday → Bell Template (set-and-forget)"
+                            Label { text: "Weekday → Bell Template + Day Letter (set-and-forget)"
                                     color: "#1e3a5f"
                                     font.bold: true
                                     font.pixelSize: 13
                                     Layout.fillWidth: true }
-                            Label { text: "Which bell times each weekday uses when no calendar date. Keep all Regular, or set Wednesday to a different template for its shorter day."
+                            Label { text: "Which bell times + Everyday/A/B each weekday uses when no date override. Keep all Regular/Everyday, or set Wednesday to Late Start/A etc. Letter picks which roster variant shows."
                                     color: "#475569"
                                     font.pixelSize: 11
                                     wrapMode: Text.WordWrap
                                     Layout.fillWidth: true }
                             GridLayout {
-                                columns: 2
-                                columnSpacing: 24
+                                columns: 1
+                                columnSpacing: 12
                                 rowSpacing: 8
                                 Layout.fillWidth: true
                                 Repeater {
-                                    model: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+                                    model: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
                                     delegate: RowLayout {
-                                        spacing: 10
+                                        spacing: 8
                                         Layout.fillWidth: true
                                         Label { text: modelData; color: "#1e293b"; Layout.preferredWidth: 85; font.pixelSize: 13 }
                                         ComboBox {
+                                            id: wtBox
                                             model: Object.keys(backend.templates).length ? Object.keys(backend.templates) : ["Regular"]
                                             currentIndex: Math.max(0, Object.keys(backend.templates).indexOf(backend.weekdayTemplates[modelData] || "Regular"))
                                             onActivated: backend.setWeekdayTemplate(modelData, currentText)
-                                            Layout.preferredWidth: 170
+                                            Layout.preferredWidth: 150
                                             Layout.preferredHeight: 36
                                             Layout.fillWidth: true
                                             background: Rectangle { color: "#ffffff"; border.color: "#1e3a5f"; border.width: 1; radius: 4 }
-                                            contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 12; font.pixelSize: 13 }
+                                            contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 10; font.pixelSize: 12 }
+                                            delegate: ItemDelegate { width: parent.width; contentItem: Text { text: modelData; color: "#0f172a"; font.pixelSize: 12 } background: Rectangle { color: highlighted ? "#e2e8f0" : "#ffffff" } highlighted: wtBox.highlightedIndex === index }
+                                        }
+                                        ComboBox {
+                                            id: wlBox
+                                            model: ["Everyday", "A", "B"]
+                                            currentIndex: Math.max(0, ["Everyday","A","B"].indexOf(backend.weekdayLetters[modelData] || "Everyday"))
+                                            onActivated: backend.setWeekdayLetter(modelData, currentText)
+                                            Layout.preferredWidth: 110
+                                            Layout.preferredHeight: 36
+                                            background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 }
+                                            contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 10; font.pixelSize: 12 }
+                                            delegate: ItemDelegate { width: parent.width; contentItem: Text { text: modelData; color: "#0f172a"; font.pixelSize: 12 } background: Rectangle { color: highlighted ? "#e2e8f0" : "#ffffff" } highlighted: wlBox.highlightedIndex === index }
                                         }
                                     }
                                 }
@@ -417,8 +430,8 @@ Dialog {
                                 spacing: 8
                                 Layout.fillWidth: true
                                 TextField { id: customDateField; placeholderText: "YYYY-MM-DD"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 130; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; radius: 4 } }
-                                ComboBox { id: customTemplateBox; model: Object.keys(backend.templates).length ? Object.keys(backend.templates) : ["Regular"]; Layout.preferredWidth: 150; Layout.preferredHeight: 36; background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 } contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 12 } }
-                                ComboBox { id: customLetterBox; model: ["Everyday", "A", "B"]; Layout.preferredWidth: 90; Layout.preferredHeight: 36; background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 } contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 12 } }
+                                ComboBox { id: customTemplateBox; model: Object.keys(backend.templates).length ? Object.keys(backend.templates) : ["Regular"]; Layout.preferredWidth: 150; Layout.preferredHeight: 36; background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 } contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 12 } delegate: ItemDelegate { width: parent.width; contentItem: Text { text: modelData; color: "#0f172a"; font.pixelSize: 12 } background: Rectangle { color: highlighted ? "#e2e8f0" : "#ffffff" } } }
+                                ComboBox { id: customLetterBox; model: ["Everyday", "A", "B"]; Layout.preferredWidth: 90; Layout.preferredHeight: 36; background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 } contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 12 } delegate: ItemDelegate { width: parent.width; contentItem: Text { text: modelData; color: "#0f172a"; font.pixelSize: 12 } background: Rectangle { color: highlighted ? "#e2e8f0" : "#ffffff" } } }
                                 Button {
                                     text: "Set"
                                     Layout.preferredWidth: 60
@@ -426,8 +439,10 @@ Dialog {
                                     background: Rectangle { color: "#1e3a5f"; radius: 4 }
                                     contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
                                     onClicked: {
-                                        var v = customTemplateBox.currentText + ":" + customLetterBox.currentText
-                                        if (customDateField.text.length === 10) backend.setCustomDay(customDateField.text, v)
+                                        if (customDateField.text.length === 10) {
+                                            backend.setCustomDayTemplate(customDateField.text, customTemplateBox.currentText)
+                                            backend.setCustomDayLetter(customDateField.text, customLetterBox.currentText)
+                                        }
                                     }
                                 }
                                 Button {
@@ -436,7 +451,7 @@ Dialog {
                                     Layout.preferredHeight: 36
                                     background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#64748b" }
                                     contentItem: Text { text: parent.text; color: "#334155"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 12 }
-                                    onClicked: if (customDateField.text.length === 10) backend.setCustomDay(customDateField.text, "")
+                                    onClicked: if (customDateField.text.length === 10) backend.clearCustomDay(customDateField.text)
                                 }
                             }
                             Label { text: "Calendar Import — source of truth (replaces all dates)"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
@@ -538,7 +553,7 @@ Dialog {
                                                 Layout.fillWidth: true
                                                 spacing: 8
                                                 Label { text: modelData; color: modelData === "Simple" ? "#1d4ed8" : "#1e3a5f"; font.bold: true; font.pixelSize: 13; Layout.fillWidth: true; elide: Text.ElideRight }
-                                                Label { text: (backend.templates[modelData] ? backend.templates[modelData].length : 0) + " blocks"; color: "#475569"; font.pixelSize: 11 }
+                                                Label { text: backend.getDisplayBlocks(modelData).length + " blocks"; color: "#475569"; font.pixelSize: 11 }
                                                 Button {
                                                     text: "Delete Template"
                                                     visible: Object.keys(backend.templates).length > 1 && modelData !== "Simple"
@@ -550,12 +565,13 @@ Dialog {
                                                 }
                                             }
                                             Repeater {
-                                                model: backend.templates[modelData]
+                                                model: backend.templates ? backend.getDisplayBlocks(tmplName) : []
                                                 delegate: RowLayout {
                                                     spacing: 6
                                                     Layout.fillWidth: true
-                                                    property string tName: modelData.name
-                                                    TextField { id: tBlockName; text: modelData.name; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 160; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#334155"; border.width: 1; radius: 4 } }
+                                                    property string tName: modelData.display_name
+                                                    property string tDisplay: modelData.display_name
+                                                    TextField { id: tBlockName; text: modelData.is_custom ? modelData.display_name : ""; placeholderText: modelData.display_name; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 160; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: modelData.is_custom ? "#ffffff" : "#f1f5f9"; border.color: "#334155"; border.width: 1; radius: 4 } }
                                                     TextField { id: tBlockStart; text: modelData.start; color: "#0f172a"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#334155"; border.width: 1; radius: 4 } }
                                                     Label { text: "→"; color: "#0f172a"; font.pixelSize: 12; font.bold: true }
                                                     TextField { id: tBlockEnd; text: modelData.end; color: "#0f172a"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#334155"; border.width: 1; radius: 4 } }
@@ -580,7 +596,7 @@ Dialog {
                                             RowLayout {
                                                 spacing: 6
                                                 Layout.fillWidth: true
-                                                TextField { id: addTName; placeholderText: "Block"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 120; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
+                                                TextField { id: addTName; placeholderText: "empty=Block N or Lunch"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 140; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
                                                 TextField { id: addTStart; placeholderText: "08:00"; text: "08:00"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
                                                 Label { text: "→"; color: "#0f172a"; font.pixelSize: 12; font.bold: true }
                                                 TextField { id: addTEnd; placeholderText: "09:20"; text: "09:20"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 70; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
@@ -599,8 +615,9 @@ Dialog {
                             }
                         }
                     }
-                    // Legacy quick Add Block (still works on global blocks)
+                    // Legacy quick Add Block (hidden — templates are source of truth)
                     Rectangle {
+                        visible: false
                         Layout.fillWidth: true
                         Layout.preferredHeight: 170
                         radius: 6
@@ -653,8 +670,9 @@ Dialog {
                             Label { text: backend.rosterImportStatus; color: backend.rosterImportStatus.indexOf("already exists")>=0 || backend.rosterImportStatus.indexOf("failed")>=0 ? "#991b1b" : "#14532d"; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 11; visible: backend.rosterImportStatus !== "" && admin.currentTab==="Schedules" }
                         }
                     }
-                    // Dynamic blocks list — bento boxed header
+                    // Dynamic blocks list — hidden (legacy)
                     Rectangle {
+                        visible: false
                         Layout.fillWidth: true
                         Layout.preferredHeight: 44
                         radius: 4
@@ -670,6 +688,7 @@ Dialog {
                         }
                     }
                     ColumnLayout {
+                        visible: false
                         spacing: 16
                         Layout.fillWidth: true
                         Repeater {
@@ -785,12 +804,12 @@ Dialog {
                                     font.pixelSize: 15
                                     font.bold: true }
                                 Item { Layout.fillWidth: true }
-                                Label { text: backend.blocks.length + " blocks"
+                                Label { text: backend.getAllBlockNames().length + " blocks (detached — assign to any Block name)"
                                     color: "#475569"
                                     font.pixelSize: 11 }
                             }
                             Label {
-                                text: "Each block shows 3 rosters: Everyday (daily) and A/B (for alternating days from your calendar). Same block, different kids on A vs B. Import adds to the selected variant."
+                                text: "Each block shows 3 rosters: Everyday (daily, used when A/B empty) and A/B (shown when weekday letter is A/B). Rosters are detached — they live on the Block name, not on times. Times → Block N via position (insert-shift)."
                                 color: "#475569"
                                 wrapMode: Text.WordWrap
                                 Layout.fillWidth: true
@@ -809,47 +828,37 @@ Dialog {
                         Layout.fillWidth: true
                         Repeater {
                             id: rosterRepeater
-                            model: backend.blocks
+                            model: backend.structuredRosters ? backend.getAllBlockNames() : backend.getAllBlockNames()
                             delegate: Rectangle {
+                                property string blockName: modelData
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 210
+                                Layout.preferredHeight: 190
                                 radius: 6
                                 color: "#ffffff"
-                                border.color: modelData.day_type === "A" ? "#1e3a5f" : modelData.day_type === "B" ? "#7f1d1d" : "#d1d5db"
+                                border.color: "#d1d5db"
                                 border.width: 2
                                 ColumnLayout {
                                     anchors.fill: parent
                                     anchors.margins: 14
                                     spacing: 10
-                                    // Row 1: Name full width, no horizontal squeeze
-                                    Label { text: modelData.name
+                                    Label { text: blockName
                                         color: "#1e3a5f"
                                         font.bold: true
                                         font.pixelSize: 14
                                         Layout.fillWidth: true
                                         elide: Text.ElideRight
                                         wrapMode: Text.NoWrap }
-                                    // Row 2: High-contrast bento meta — fully inside card, no hang
                                     RowLayout {
                                         spacing: 10
                                         Layout.fillWidth: true
                                         Rectangle {
-                                            color: modelData.day_type === "A" ? "#1e3a5f" : modelData.day_type === "B" ? "#7f1d1d" : "#334155"
+                                            color: "#334155"
                                             radius: 6
-                                            border.color: modelData.day_type === "A" ? "#1e3a5f" : modelData.day_type === "B" ? "#991b1b" : "#334155"
+                                            border.color: "#334155"
                                             border.width: 1
-                                            Layout.preferredWidth: 92
+                                            Layout.preferredWidth: 110
                                             Layout.preferredHeight: 22
-                                            Label { anchors.centerIn: parent; text: modelData.day_type === "Everyday" ? "Everyday" : "Day " + modelData.day_type; color: "white"; font.pixelSize: 11; font.bold: true; elide: Text.ElideRight }
-                                        }
-                                        Rectangle {
-                                            color: "#ffffff"
-                                            radius: 6
-                                            border.color: "#1e3a5f"
-                                            border.width: 1
-                                            Layout.preferredWidth: 136
-                                            Layout.preferredHeight: 22
-                                            Label { anchors.centerIn: parent; text: modelData.start + " → " + modelData.end; color: "#1e3a5f"; font.pixelSize: 11; font.bold: true }
+                                            Label { anchors.centerIn: parent; text: blockName.indexOf("Block")===0 ? "Auto Block" : "Custom Block"; color: "white"; font.pixelSize: 10; font.bold: true; elide: Text.ElideRight }
                                         }
                                         Item { Layout.fillWidth: true }
                                         Rectangle {
@@ -857,9 +866,9 @@ Dialog {
                                             radius: 4
                                             border.color: "#d1d5db"
                                             border.width: 1
-                                            Layout.preferredWidth: 96
+                                            Layout.preferredWidth: 110
                                             Layout.preferredHeight: 22
-                                            Label { anchors.centerIn: parent; text: (backend.flatRosters[modelData.name] ? backend.flatRosters[modelData.name].length : 0) + " students"; color: "#1e293b"; font.pixelSize: 11; font.bold: true; elide: Text.ElideRight }
+                                            Label { anchors.centerIn: parent; text: (backend.structuredRosters[blockName] ? ((backend.structuredRosters[blockName]["Everyday"]||[]).length + (backend.structuredRosters[blockName]["A"]||[]).length + (backend.structuredRosters[blockName]["B"]||[]).length) : (backend.flatRosters[blockName] ? backend.flatRosters[blockName].length : 0)) + " total"; color: "#1e293b"; font.pixelSize: 11; font.bold: true; elide: Text.ElideRight }
                                         }
                                     }
                                     RowLayout {
@@ -874,30 +883,30 @@ Dialog {
                                             Layout.preferredHeight: 30
                                             background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 }
                                             contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 11; font.bold: true }
+                                            delegate: ItemDelegate { width: parent.width; contentItem: Text { text: modelData; color: "#0f172a"; font.pixelSize: 11 } background: Rectangle { color: highlighted ? "#e2e8f0" : "#ffffff"} }
                                             onCurrentTextChanged: {
-                                                var t = backend.getRosterForBlockVariant(modelData.name, currentText)
+                                                var t = backend.getRosterForBlockVariant(blockName, currentText)
                                                 rosterField.originalText = t
                                                 rosterField.text = t
                                                 var mm = admin.rosterDirty
-                                                mm[modelData.name + ":" + currentText] = false
+                                                mm[blockName + ":" + currentText] = false
                                                 admin.rosterDirty = mm
                                             }
                                         }
                                         Label {
-                                            text: variantBox.currentText === "Everyday" ? "• daily — shows when A/B empty" : variantBox.currentText === "A" ? "• A days from calendar" : "• B days from calendar"
+                                            text: variantBox.currentText === "Everyday" ? "• daily — shows when A/B empty" : variantBox.currentText === "A" ? "• A days" : "• B days"
                                             color: "#64748b"
                                             font.pixelSize: 10
                                             Layout.fillWidth: true
                                             elide: Text.ElideRight
                                         }
                                     }
-                                    // Row 3: TextField full width — owns its line, no button overlap
                                     TextField {
                                         id: rosterField
                                         objectName: "rosterField"
-                                        property string originalText: backend.getRosterForBlockVariant(modelData.name, variantBox.currentText)
+                                        property string originalText: backend.getRosterForBlockVariant(blockName, variantBox.currentText)
                                         text: originalText
-                                        placeholderText: variantBox.currentText === "Everyday" ? "Everyday roster — e.g., Alex, Sam (used when A/B empty)" : variantBox.currentText + " roster — e.g., Alex for " + variantBox.currentText
+                                        placeholderText: variantBox.currentText === "Everyday" ? "Everyday — e.g., Alex, Sam" : variantBox.currentText + " — e.g., Alex for " + variantBox.currentText
                                         color: "#1e293b"
                                         placeholderTextColor: "#64748b"
                                         background: Rectangle { color: rosterField.text !== rosterField.originalText ? "#fef3c7" : "#ffffff"; border.color: rosterField.text !== rosterField.originalText ? "#f59e0b" : "#d1d5db"; radius: 4; border.width: rosterField.text !== rosterField.originalText ? 2 : 1 }
@@ -906,12 +915,12 @@ Dialog {
                                         font.pixelSize: 12
                                         onTextChanged: {
                                             var m = admin.rosterDirty
-                                            m[modelData.name + ":" + variantBox.currentText] = (text !== originalText)
+                                            m[blockName + ":" + variantBox.currentText] = (text !== originalText)
                                             admin.rosterDirty = m
                                         }
                                         Component.onCompleted: {
                                             var m = admin.rosterDirty
-                                            m[modelData.name + ":" + variantBox.currentText] = false
+                                            m[blockName + ":" + variantBox.currentText] = false
                                             admin.rosterDirty = m
                                         }
                                     }
@@ -923,7 +932,6 @@ Dialog {
                                         font.bold: true
                                         Layout.fillWidth: true
                                     }
-                                    // Row 4: 3 buttons — Save / Import / Delete All (with confirm)
                                     RowLayout {
                                         spacing: 8
                                         Layout.fillWidth: true
@@ -934,10 +942,10 @@ Dialog {
                                             background: Rectangle { color: "#1e3a5f"; radius: 4 }
                                             contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 11 }
                                             onClicked: {
-                                                if (backend.setRosterForBlockVariant(modelData.name, variantBox.currentText, rosterField.text)) {
+                                                if (backend.setRosterForBlockVariant(blockName, variantBox.currentText, rosterField.text)) {
                                                     rosterField.originalText = rosterField.text
                                                     var m = admin.rosterDirty
-                                                    m[modelData.name + ":" + variantBox.currentText] = false
+                                                    m[blockName + ":" + variantBox.currentText] = false
                                                     admin.rosterDirty = m
                                                 }
                                             }
@@ -948,7 +956,7 @@ Dialog {
                                             Layout.preferredHeight: 36
                                             background: Rectangle { color: "#334155"; radius: 4 }
                                             contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 11 }
-                                            onClicked: { admin.pendingRosterBlock = modelData.name; rosterFileDialog.open() }
+                                            onClicked: { admin.pendingRosterBlock = blockName; rosterFileDialog.open() }
                                         }
                                         Button {
                                             text: "Delete All"
@@ -956,7 +964,7 @@ Dialog {
                                             Layout.preferredHeight: 36
                                             background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#991b1b"; border.width: 1 }
                                             contentItem: Text { text: parent.text; color: "#991b1b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 11 }
-                                            onClicked: { deleteConfirmDialog.blockName = modelData.name; deleteConfirmDialog.open() }
+                                            onClicked: { deleteConfirmDialog.blockName = blockName; deleteConfirmDialog.open() }
                                         }
                                     }
                                     Label {
@@ -965,7 +973,7 @@ Dialog {
                                         font.pixelSize: 10
                                         wrapMode: Text.WordWrap
                                         Layout.fillWidth: true
-                                        visible: backend.rosterImportStatus !== "" && backend.rosterImportStatus.indexOf(modelData.name) >= 0
+                                        visible: backend.rosterImportStatus !== "" && backend.rosterImportStatus.indexOf(blockName) >= 0
                                     }
                                 }
                             }

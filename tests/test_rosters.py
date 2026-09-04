@@ -15,8 +15,12 @@ def test_non_destructive_merge():
         csv_path = Path(tmp)/"import.csv"
         csv_path.write_text("Student Name,Block ID\nSam Rivera,Block_1\nAlex Johnson,Block_1\n", encoding="utf-8")
         merged = merge_roster_csv(csv_path)
-        # merged is nested: Block_A_Schedule -> Block_1
-        block = merged.get("Block_A_Schedule", {}).get("Block_1", []) if "Block_A_Schedule" in merged else merged.get("Block_1", [])
+        # merged is structured: Block_1 -> {Everyday, A, B} or legacy nested/flat
+        if "Block_A_Schedule" in merged:
+            block = merged.get("Block_A_Schedule", {}).get("Block_1", [])
+        else:
+            val = merged.get("Block_1", [])
+            block = val.get("Everyday", []) if isinstance(val, dict) else val
         assert "Sam Rivera" in block
         assert block.count("Alex Johnson")==1
         assert "Alex Johnson" in block
@@ -29,5 +33,9 @@ def test_headerless_csv():
         csv_path = Path(tmp)/"import2.csv"
         csv_path.write_text("Jordan Lee,Block_1\n", encoding="utf-8")
         merged = merge_roster_csv(csv_path)
-        block = merged.get("Block_A_Schedule", {}).get("Block_1", []) if "Block_A_Schedule" in merged else merged.get("Block_1", [])
+        if "Block_A_Schedule" in merged:
+            block = merged.get("Block_A_Schedule", {}).get("Block_1", [])
+        else:
+            val = merged.get("Block_1", [])
+            block = val.get("Everyday", []) if isinstance(val, dict) else val
         assert "Jordan Lee" in block

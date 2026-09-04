@@ -301,6 +301,14 @@ class Backend(QObject):
             return {}
 
     @Property("QVariantMap", notify=scheduleChanged)  # type: ignore
+    def weekdayLetters(self) -> dict:
+        try:
+            from .schedules import get_weekday_letters
+            return get_weekday_letters()
+        except Exception:
+            return {}
+
+    @Property("QVariantMap", notify=scheduleChanged)  # type: ignore
     def dateOverrides(self) -> dict:
         try:
             return get_date_overrides()
@@ -308,9 +316,41 @@ class Backend(QObject):
             return {}
 
     @Property("QVariantMap", notify=scheduleChanged)  # type: ignore
+    def dateTemplates(self) -> dict:
+        try:
+            from .schedules import get_date_templates
+            return get_date_templates()
+        except Exception:
+            return {}
+
+    @Property("QVariantMap", notify=scheduleChanged)  # type: ignore
+    def dateLetters(self) -> dict:
+        try:
+            from .schedules import get_date_letters
+            return get_date_letters()
+        except Exception:
+            return {}
+
+    @Property("QVariantMap", notify=scheduleChanged)  # type: ignore
     def customDays(self) -> dict:
         try:
             return get_custom_days()
+        except Exception:
+            return {}
+
+    @Property("QVariantMap", notify=scheduleChanged)  # type: ignore
+    def customDayTemplates(self) -> dict:
+        try:
+            from .schedules import get_custom_day_templates
+            return get_custom_day_templates()
+        except Exception:
+            return {}
+
+    @Property("QVariantMap", notify=scheduleChanged)  # type: ignore
+    def customDayLetters(self) -> dict:
+        try:
+            from .schedules import get_custom_day_letters
+            return get_custom_day_letters()
         except Exception:
             return {}
 
@@ -722,33 +762,56 @@ class Backend(QObject):
         except Exception:
             return False
 
+    @Slot(str, result="QVariantList")
+    def getDisplayBlocks(self, template: str) -> list:
+        try:
+            from .schedules import get_display_blocks
+            return get_display_blocks(template.strip())
+        except Exception:
+            return []
+
+    @Slot(result="QVariantList")
+    def getAllBlockNames(self) -> list:
+        try:
+            from .schedules import get_all_display_names
+            return get_all_display_names()
+        except Exception:
+            return []
+
     @Slot(str, str, str, str, result=bool)
     def addBlockToTemplate(self, template: str, name: str, start: str, end: str) -> bool:
         try:
             tname = template.strip()
             n = name.strip()
-            if not tname or not n:
+            if not tname:
                 return False
+            # name may be empty for auto Block N
             t = get_templates()
             if tname not in t:
                 return False
-            if any(b.get("name","").lower()==n.lower() for b in t[tname]):
+            if n and any((b.get("name") or "").strip().lower()==n.lower() for b in t[tname]):
                 self._roster_import_status = f"Block '{n}' already in {tname}"
                 self.rosterImportStatusChanged.emit(self._roster_import_status)
                 return False
             def ok(x: str) -> bool:
-                try: h,m = x.split(":"); return 0 <= int(h) <=23 and 0 <= int(m) <=59
+                try: h,m = x.strip().split(":"); return 0 <= int(h) <=23 and 0 <= int(m) <=59
                 except: return False
             if not ok(start) or not ok(end):
                 self._roster_import_status = "Use HH:MM"
                 self.rosterImportStatusChanged.emit(self._roster_import_status)
                 return False
-            t[tname].append({"name": n, "start": start.strip(), "end": end.strip()})
+            raw_name = "" if not n or n.lower().startswith("block ") and n[6:].strip().isdigit() else n
+            # Treat Block N as auto
+            from .schedules import _is_auto_name as _is_auto
+            if _is_auto(raw_name):
+                raw_name = ""
+            t[tname].append({"name": raw_name, "start": start.strip(), "end": end.strip()})
             t[tname] = sorted(t[tname], key=lambda x: x["start"])
             set_templates(t)
             self.scheduleChanged.emit()
             self._resolve_block()
             self.activeBlockChanged.emit(self._block_id)
+            self.rosterChanged.emit()
             return True
         except Exception as e:
             self._roster_import_status = f"Add failed: {e}"
@@ -762,22 +825,61 @@ class Backend(QObject):
             t = get_templates()
             if tname not in t:
                 return False
+            # Resolve old block by display name or raw name or index fallback
             idx = -1
+            old = oldName.strip()
+            # Try match raw name
             for i,b in enumerate(t[tname]):
-                if b.get("name")==oldName.strip():
+                if (b.get("name") or "").strip() == old:
                     idx = i; break
+            if idx == -1:
+                # Try match display name via get_display_blocks
+                try:
+                    from .schedules import get_display_blocks
+                    displays = get_display_blocks(tname)
+                    for i, db in enumerate(displays):
+                        if db.get("display_name") == old:
+                            # Map display index to raw sorted index: displays is already sorted by start, same order as t[tname] sorted
+                            # Find raw block with same start as display
+                            target_start = db.get("start")
+                            for j, raw in enumerate(t[tname]):
+                                if raw.get("start") == target_start and (raw.get("name") or "").strip() == (db.get("name") or "").strip():
+                                    idx = j; break
+                            if idx != -1:
+                                break
+                except Exception:
+                    pass
             if idx==-1:
                 return False
             nn = newName.strip()
-            if oldName.strip().lower()!=nn.lower() and any(b.get("name","").lower()==nn.lower() for b in t[tname]):
+            # Treat Block N as auto
+            from .schedules import _is_auto_name as _is_auto
+            if _is_auto(nn):
+                nn = ""
+            # Duplicate check for custom names only
+            if nn and old.lower()!=nn.lower() and any((b.get("name") or "").strip().lower()==nn.lower() for b in t[tname]):
                 self._roster_import_status = f"Block '{nn}' already in {tname}"
                 self.rosterImportStatusChanged.emit(self._roster_import_status)
                 return False
+            old_display = old
+            # Capture old raw for roster rename if custom
+            old_raw = (t[tname][idx].get("name") or "").strip()
             t[tname][idx] = {"name": nn, "start": start.strip(), "end": end.strip()}
             t[tname] = sorted(t[tname], key=lambda x: x["start"])
             set_templates(t)
-            if oldName.strip()!=nn:
-                try: rename_block_roster(oldName.strip(), nn)
+            # Roster migration only for custom renames (not auto shift)
+            if old_raw and nn and old_raw != nn:
+                try: rename_block_roster(old_raw, nn)
+                except: pass
+            elif not old_raw and not nn:
+                pass
+            elif old and nn and old != nn:
+                # Old was display auto vs custom? Try rename by display if custom involved
+                try:
+                    if old_raw == "" and nn == "":
+                        pass
+                    elif old_raw != "" or nn != "":
+                        rename_block_roster(old, nn if nn else old)
                 except: pass
             self.scheduleChanged.emit()
             self._resolve_block()
@@ -797,7 +899,23 @@ class Backend(QObject):
             if tname not in t:
                 return False
             n = name.strip()
-            nb = [b for b in t[tname] if b.get("name")!=n]
+            # Try raw match first, then display match
+            nb = [b for b in t[tname] if (b.get("name") or "").strip()!=n]
+            if len(nb)==len(t[tname]):
+                # Try display
+                try:
+                    from .schedules import get_display_blocks
+                    displays = get_display_blocks(tname)
+                    keep = []
+                    for db in displays:
+                        if db.get("display_name") != n:
+                            # keep raw with same start
+                            for raw in t[tname]:
+                                if raw.get("start")==db.get("start") and (raw.get("name") or "").strip()==(db.get("name") or "").strip():
+                                    keep.append(raw); break
+                    nb = keep
+                except Exception:
+                    pass
             if len(nb)==len(t[tname]):
                 return False
             if len(nb)==0:
@@ -814,14 +932,110 @@ class Backend(QObject):
             self._roster_import_status = f"Delete failed: {e}"
             self.rosterImportStatusChanged.emit(self._roster_import_status)
             return False
-        except Exception:
-            return False
 
     @Slot(str, str, result=bool)
     def setWeekdayTemplate(self, weekday: str, template: str) -> bool:
         try:
             from .schedules import set_weekday_template
             set_weekday_template(weekday, template)
+            self.scheduleChanged.emit()
+            self._resolve_block()
+            self._update_roster_cache()
+            self.activeBlockChanged.emit(self._block_id)
+            self.rosterChanged.emit()
+            return True
+        except Exception:
+            return False
+
+    @Slot(str, str, result=bool)
+    def setWeekdayLetter(self, weekday: str, letter: str) -> bool:
+        try:
+            from .schedules import set_weekday_letter
+            set_weekday_letter(weekday, letter)
+            self.scheduleChanged.emit()
+            self._resolve_block()
+            self._update_roster_cache()
+            self.activeBlockChanged.emit(self._block_id)
+            self.rosterChanged.emit()
+            return True
+        except Exception:
+            return False
+
+    @Slot(str, str, result=bool)
+    def setDateTemplate(self, date_str: str, template: str) -> bool:
+        try:
+            from .schedules import set_date_template
+            set_date_template(date_str.strip(), template.strip())
+            self.scheduleChanged.emit()
+            self._resolve_block()
+            self._update_roster_cache()
+            self.activeBlockChanged.emit(self._block_id)
+            self.rosterChanged.emit()
+            return True
+        except Exception:
+            return False
+
+    @Slot(str, str, result=bool)
+    def setDateLetter(self, date_str: str, letter: str) -> bool:
+        try:
+            from .schedules import set_date_letter
+            set_date_letter(date_str.strip(), letter.strip())
+            self.scheduleChanged.emit()
+            self._resolve_block()
+            self._update_roster_cache()
+            self.activeBlockChanged.emit(self._block_id)
+            self.rosterChanged.emit()
+            return True
+        except Exception:
+            return False
+
+    @Slot(str, result=bool)
+    def clearDateOverride(self, date_str: str) -> bool:
+        try:
+            from .schedules import clear_date_override
+            clear_date_override(date_str.strip())
+            self.scheduleChanged.emit()
+            self._resolve_block()
+            self._update_roster_cache()
+            self.activeBlockChanged.emit(self._block_id)
+            self.rosterChanged.emit()
+            return True
+        except Exception:
+            return False
+
+    @Slot(str, str, result=bool)
+    def setCustomDayTemplate(self, date_str: str, template: str) -> bool:
+        try:
+            from .schedules import set_custom_day_template
+            set_custom_day_template(date_str.strip(), template.strip())
+            self.scheduleChanged.emit()
+            self._resolve_block()
+            self._update_roster_cache()
+            self.activeBlockChanged.emit(self._block_id)
+            self.rosterChanged.emit()
+            return True
+        except Exception:
+            return False
+
+    @Slot(str, str, result=bool)
+    def setCustomDayLetter(self, date_str: str, letter: str) -> bool:
+        try:
+            from .schedules import set_custom_day_letter
+            set_custom_day_letter(date_str.strip(), letter.strip())
+            self.scheduleChanged.emit()
+            self._resolve_block()
+            self._update_roster_cache()
+            self.activeBlockChanged.emit(self._block_id)
+            self.rosterChanged.emit()
+            return True
+        except Exception:
+            return False
+
+    @Slot(str, result=bool)
+    def clearCustomDay(self, date_str: str) -> bool:
+        try:
+            from .schedules import clear_custom_day
+            clear_custom_day(date_str.strip())
             self.scheduleChanged.emit()
             self._resolve_block()
             self._update_roster_cache()
