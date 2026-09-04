@@ -349,6 +349,7 @@ ApplicationWindow {
                         RowLayout {
                             anchors.fill: parent
                             anchors.margins: 12
+                            spacing: 8
                             Label {
                                 text: (index+1)+". "+modelData.name
                                 color: "#1e293b"
@@ -356,6 +357,7 @@ ApplicationWindow {
                                 font.pixelSize: 15
                                 font.bold: true
                                 Layout.fillWidth: true
+                                elide: Text.ElideRight
                             }
                             Label {
                                 text: modelData.passType
@@ -363,6 +365,14 @@ ApplicationWindow {
                                 font.family: "Source Sans Pro"
                                 font.pixelSize: 11
                                 font.italic: true
+                            }
+                            Button {
+                                text: "✕"
+                                Layout.preferredWidth: 32
+                                Layout.preferredHeight: 32
+                                background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#fecaca"; border.width: 1 }
+                                contentItem: Text { text: parent.text; color: "#991b1b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 14; font.bold: true }
+                                onClicked: backend.cancelQueue(modelData.name)
                             }
                         }
                     }
@@ -411,8 +421,8 @@ ApplicationWindow {
                         width: 200
                         height: 92
                         radius: 6
-                        color: modelData.overtime === "OVERTIME" ? "#fef2f2" : "#f8f9fa"
-                        border.color: modelData.overtime === "OVERTIME" ? "#fecaca" : "#e5e7eb"
+                        color: modelData.overtime === "OVERTIME" ? "#fef2f2" : modelData.overtime === "CANCELLED" ? "#fef9c3" : "#f8f9fa"
+                        border.color: modelData.overtime === "OVERTIME" ? "#fecaca" : modelData.overtime === "CANCELLED" ? "#fde68a" : "#e5e7eb"
                         border.width: 1
                         ColumnLayout {
                             anchors.fill: parent
@@ -436,11 +446,11 @@ ApplicationWindow {
                                 spacing: 6
                                 Label { text: modelData.timeOut + " → " + modelData.timeIn; color: "#334155"; font.family: "Source Sans Pro"; font.pixelSize: 11; Layout.fillWidth: true }
                                 Rectangle {
-                                    color: modelData.overtime === "OVERTIME" ? "#991b1b" : "#e5e7eb"
+                                    color: modelData.overtime === "OVERTIME" ? "#991b1b" : modelData.overtime === "CANCELLED" ? "#f59e0b" : "#e5e7eb"
                                     radius: 4
-                                    Layout.preferredWidth: modelData.overtime === "OVERTIME" ? 62 : 68
+                                    Layout.preferredWidth: modelData.overtime === "OVERTIME" ? 62 : modelData.overtime === "CANCELLED" ? 72 : 68
                                     Layout.preferredHeight: 16
-                                    Label { anchors.centerIn: parent; text: modelData.overtime === "OVERTIME" ? "OVERTIME" : modelData.duration; color: modelData.overtime === "OVERTIME" ? "white" : "#334155"; font.pixelSize: 9; font.bold: true }
+                                    Label { anchors.centerIn: parent; text: modelData.overtime === "OVERTIME" ? "OVERTIME" : modelData.overtime === "CANCELLED" ? "CANCELLED" : modelData.duration; color: modelData.overtime === "OVERTIME" || modelData.overtime === "CANCELLED" ? "white" : "#334155"; font.pixelSize: 9; font.bold: true }
                                 }
                             }
                         }

@@ -31,6 +31,7 @@ class PassType(str, Enum):
 class OvertimeStatus(str, Enum):
     NOT_OVER = "NOT OVER"
     OVERTIME = "OVERTIME"
+    CANCELLED = "CANCELLED"
 
 
 @dataclass

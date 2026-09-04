@@ -1177,6 +1177,18 @@ class Backend(QObject):
             self.queueChanged.emit()
             self.photosChanged.emit()
 
+    @Slot(str, result=bool)
+    def cancelQueue(self, name: str) -> bool:
+        try:
+            if self.sm.cancel_queued(name.strip()):
+                self.queueChanged.emit()
+                self.historyChanged.emit()
+                self.photosChanged.emit()
+                return True
+            return False
+        except Exception:
+            return False
+
     @Slot()
     def returnPass(self) -> None:
         # Capture 'in' with current active student's name/block (the returning student's block, not current time's)

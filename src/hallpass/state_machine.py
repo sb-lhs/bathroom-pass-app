@@ -21,7 +21,13 @@ class State(str, Enum):
 class QueuedStudent:
     name: str
     pass_type: PassType
-    photo_out_path: str = "" 
+    photo_out_path: str = ""
+    queued_at: datetime = None  # type: ignore
+    block_id: str = ""
+
+    def __post_init__(self):
+        if self.queued_at is None:
+            self.queued_at = datetime.now()
 
 
 @dataclass
@@ -86,20 +92,41 @@ class PassStateMachine:
     def enqueue(self, name: str, pass_type: PassType, photo_out_path: str = "") -> bool:
         if not name:
             return False
-        # Prevent duplicate in queue (case-insensitive)
         lower = {q.name.lower() for q in self.queue}
         if name.lower() in lower:
             return False
-        # Also prevent enqueue if same as active
         if self.active and self.active.student_name.lower() == name.lower():
             return False
-        self.queue.append(QueuedStudent(name=name, pass_type=pass_type, photo_out_path=photo_out_path))
+        self.queue.append(QueuedStudent(name=name, pass_type=pass_type, photo_out_path=photo_out_path, queued_at=datetime.now(), block_id=self.current_block()))
         return True
 
     def dequeue(self, name: str) -> bool:
         for i, q in enumerate(self.queue):
             if q.name.lower() == name.lower():
                 del self.queue[i]
+                return True
+        return False
+
+    def cancel_queued(self, name: str) -> bool:
+        for i, q in enumerate(self.queue):
+            if q.name.lower() == name.lower():
+                cancelled = self.queue[i]
+                del self.queue[i]
+                try:
+                    rec = PassRecord(
+                        student_name=cancelled.name,
+                        block_id=cancelled.block_id or self.current_block(),
+                        pass_type=cancelled.pass_type,
+                        time_out=cancelled.queued_at,
+                        time_in=datetime.now(),
+                        duration_minutes=0.0,
+                        overtime_status=OvertimeStatus.CANCELLED,
+                        photo_out_path=cancelled.photo_out_path or "",
+                        photo_in_path="",
+                    )
+                    self.storage.append_log(rec)
+                except Exception:
+                    pass
                 return True
         return False
 
