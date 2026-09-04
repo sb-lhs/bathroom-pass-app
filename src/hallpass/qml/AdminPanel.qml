@@ -332,7 +332,8 @@ Dialog {
                                 spacing: 10
                                 Label { text: "Simple Mode (All Day, All Students)"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 13; Layout.fillWidth: true }
                                 Switch {
-                                    checked: backend.simpleMode
+                                    id: simpleModeSwitch
+                                    Binding on checked { value: backend ? backend.simpleMode : false }
                                     onToggled: backend.setSimpleMode(checked)
                                 }
                             }
@@ -352,8 +353,13 @@ Dialog {
                                     id: simpleRosterField
                                     text: backend.simpleRosterText
                                     placeholderText: "alice, bob, carol"
+                                    color: "#0f172a"
+                                    placeholderTextColor: "#64748b"
+                                    selectionColor: "#3b82f6"
+                                    selectedTextColor: "white"
                                     Layout.fillWidth: true
                                     font.pixelSize: 12
+                                    background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 }
                                     onEditingFinished: backend.setSimpleRoster(text)
                                 }
                                 Button { text: "Save"; onClicked: backend.setSimpleRoster(simpleRosterField.text); Layout.preferredWidth: 80 }
@@ -1140,11 +1146,14 @@ Dialog {
                     spacing: 16
                     Layout.fillWidth: true
                     Rectangle {
+                        id: photoAuditRect
                         Layout.fillWidth: true
+                        Layout.preferredHeight: photoAuditCol.implicitHeight + 32
                         radius: 4
                         color: "#ffffff"
                         border.color: "#d1d5db"
                         ColumnLayout {
+                            id: photoAuditCol
                             anchors.fill: parent
                             anchors.margins: 16
                             spacing: 10
@@ -1201,13 +1210,15 @@ Dialog {
                             }
                         }
                         Rectangle {
+                            id: cameraBoxRect
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 150
+                            Layout.preferredHeight: cameraBoxCol.implicitHeight + 24
                             radius: 4
                             color: "#fef2f2"
                             border.color: "#fecaca"
                             border.width: 1
                             ColumnLayout {
+                                id: cameraBoxCol
                                 anchors.fill: parent
                                 anchors.margins: 12
                                 spacing: 6
@@ -1223,7 +1234,8 @@ Dialog {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 32
                                     background: Rectangle { color: "#ffffff"; border.color: "#991b1b"; radius: 4; border.width: 1 }
-                                    contentItem: Text { text: "Camera " + parent.displayText + (parent.displayText == backend.selectedCameraIndex ? " ✓" : ""); color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 10; font.pixelSize: 11 }
+                                    contentItem: Text { text: "Camera " + parent.displayText + (parent.displayText == backend.selectedCameraIndex ? " ✓" : ""); color: "#0f172a"; verticalAlignment: Text.AlignVCenter; leftPadding: 10; font.pixelSize: 11 }
+                                    delegate: ItemDelegate { width: parent.width; contentItem: Text { text: "Camera " + modelData; color: "#0f172a"; font.pixelSize: 11; verticalAlignment: Text.AlignVCenter } background: Rectangle { color: highlighted ? "#e2e8f0" : "#ffffff" } highlighted: cameraBox.highlightedIndex === index }
                                     Component.onCompleted: currentIndex = Math.max(0, backend.availableCameraIndices.indexOf(backend.selectedCameraIndex))
                                     onActivated: backend.setSelectedCameraIndex(parseInt(currentText))
                                 }
@@ -1361,7 +1373,10 @@ Dialog {
                                     model: backend ? backend.alarmSounds : []; Component.onCompleted: if (backend) currentIndex = backend.alarmSounds.indexOf(backend.selectedAlarmSound)
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 38
-                                    background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 } }
+                                    background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 }
+                                    contentItem: Text { text: parent.displayText; color: "#0f172a"; verticalAlignment: Text.AlignVCenter; leftPadding: 12; font.pixelSize: 12; elide: Text.ElideRight }
+                                    delegate: ItemDelegate { width: parent.width; contentItem: Text { text: modelData; color: "#0f172a"; font.pixelSize: 12; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter } background: Rectangle { color: highlighted ? "#e2e8f0" : "#ffffff" } highlighted: soundBox.highlightedIndex === index }
+                                    popup: Popup { y: soundBox.height - 1; width: soundBox.width; implicitHeight: contentItem.implicitHeight; padding: 1; contentItem: ListView { clip: true; implicitHeight: contentHeight; model: soundBox.popup.visible ? soundBox.delegateModel : null } background: Rectangle { color: "#ffffff"; border.color: "#475569"; radius: 4 } } }
                                 RowLayout {
                                     spacing: 10
                                     Layout.fillWidth: true
@@ -1608,7 +1623,9 @@ Dialog {
                                 model: ["Auto-Detect USB (/media)", "Local Folder"]
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 38
-                                background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
+                                background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 }
+                                contentItem: Text { text: parent.displayText; color: "#0f172a"; verticalAlignment: Text.AlignVCenter; leftPadding: 12; font.pixelSize: 12; elide: Text.ElideRight }
+                                delegate: ItemDelegate { width: parent.width; contentItem: Text { text: modelData; color: "#0f172a"; font.pixelSize: 12; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter } background: Rectangle { color: highlighted ? "#e2e8f0" : "#ffffff" } highlighted: exportChoice.highlightedIndex === index }
                             }
                             Button {
                                 text: "Export CSV Logs & Photos"
