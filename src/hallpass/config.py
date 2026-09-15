@@ -16,7 +16,7 @@ from typing import Any
 
 DEFAULT_BATHROOM_THRESHOLD = 420
 DEFAULT_WATER_THRESHOLD = 180
-DEFAULT_ALARM_SOUND = "mixkit-facility-alarm-sound-999.wav"
+DEFAULT_ALARM_SOUND = "old_bell_style_ring.wav"
 DEFAULT_TTS_ENABLED = True
 DEFAULT_ADMIN_PASS = "admin123"
 
@@ -215,12 +215,15 @@ def _ensure_config_exists() -> Path:
 
 
 def _parse_raw_config(raw: dict[str, Any]) -> AppConfig:
+    sel = str(raw.get("selected_alarm_sound", DEFAULT_ALARM_SOUND))
+    if sel == "mixkit-facility-alarm-sound-999.wav":
+        sel = DEFAULT_ALARM_SOUND
     return AppConfig(
         bathroom_threshold_seconds=int(raw.get("bathroom_threshold_seconds", DEFAULT_BATHROOM_THRESHOLD)),
         water_threshold_seconds=int(raw.get("water_threshold_seconds", DEFAULT_WATER_THRESHOLD)),
         admin_password_hash=str(raw.get("admin_password_hash", "")),
         salt=str(raw.get("salt", "")),
-        selected_alarm_sound=str(raw.get("selected_alarm_sound", DEFAULT_ALARM_SOUND)),
+        selected_alarm_sound=sel,
         tts_enabled=bool(raw.get("tts_enabled", DEFAULT_TTS_ENABLED)),
         active_schedule_profile_override=raw.get("active_schedule_profile_override"),
         first_run=bool(raw.get("first_run", False)),

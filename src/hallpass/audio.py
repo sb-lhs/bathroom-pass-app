@@ -40,7 +40,16 @@ class AlarmService:
                     out.add(p.name)
                 for p in d.glob("*.ogg"):
                     out.add(p.name)
-        return sorted(out) or ["classic_chime.wav", "digital_alarm.wav", "subtle_bell.wav"]
+                for p in d.glob("*.mp3"):
+                    out.add(p.name)
+        # Prefer old school bell first if present
+        sounds = sorted(out) or ["classic_chime.wav", "digital_alarm.wav", "subtle_bell.wav"]
+        if "old_bell_style_ring.wav" in sounds:
+            sounds.remove("old_bell_style_ring.wav")
+            sounds.insert(0, "old_bell_style_ring.wav")
+        if "old_bell_style_ring.mp3" in sounds and "old_bell_style_ring.wav" not in sounds:
+            sounds.insert(0, "old_bell_style_ring.mp3")
+        return sounds
 
     def _resolve(self, name: str) -> Path | None:
         for d in [self.sounds_dir, Path("/usr/share/hallpass/sounds"), Path.cwd() / "sounds"]:

@@ -33,7 +33,12 @@ Dialog {
         Button {
             Layout.fillWidth: true
             height: 68
-            text: "Bathroom Pass (7 min)"
+            text: {
+                var sec = backend ? backend.bathroomThreshold : 420
+                var m = Math.floor(sec/60)
+                var s = sec % 60
+                return "Bathroom Pass (" + m + " min" + (s ? " " + s + " sec" : "") + ")"
+            }
             font.family: "Source Sans Pro"
             font.pixelSize: 16
             font.bold: true
@@ -46,7 +51,12 @@ Dialog {
         Button {
             Layout.fillWidth: true
             height: 68
-            text: "Water Fill Pass (3 min)"
+            text: {
+                var sec = backend ? backend.waterThreshold : 180
+                var m = Math.floor(sec/60)
+                var s = sec % 60
+                return "Water Fill Pass (" + m + " min" + (s ? " " + s + " sec" : "") + ")"
+            }
             font.family: "Source Sans Pro"
             font.pixelSize: 16
             font.bold: true
