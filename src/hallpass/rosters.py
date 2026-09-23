@@ -336,6 +336,18 @@ def set_roster_for_block(block_name: str, names: list[str]) -> None:
     set_roster_for_block_variant(block_name, "Everyday", names)
 
 
+def create_block_roster(name: str) -> bool:
+    clean = str(name or "").strip()
+    if not clean:
+        return False
+    s = load_rosters_structured()
+    if clean in s:
+        return False
+    s[clean] = default_block_variants()
+    save_rosters(s)
+    return True
+
+
 def rename_block_roster(old_name: str, new_name: str) -> None:
     if old_name == new_name:
         return

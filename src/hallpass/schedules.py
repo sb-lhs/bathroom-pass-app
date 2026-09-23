@@ -22,6 +22,7 @@ from typing import Any
 from .config import _config_dir, schedules_path
 
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+SCHOOL_WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 
 
 DAY_TYPES = ["Everyday", "A", "B"]
@@ -611,7 +612,55 @@ def _resolve_today_entry(data: dict[str, Any], today_key: str, weekday: str | No
     return None
 
 
-def active_block(now: datetime | None = None, override: str | None = None) -> tuple[str, str]:
+def format_12h(hhmm: str) -> str:
+    try:
+        h, m = str(hhmm or "").strip().split(":")
+        h, m = int(h), int(m)
+        if not 0 <= h <= 23 and 0 <= m <= 59:
+            return str(hhmm)
+        suffix = "AM" if h < 12 else "PM"
+        h12 = h % 12 or 12
+        return f"{h12}:{m:02d} {suffix}"
+    except Exception:
+        return str(hhmm or "")
+
+
+def parse_time_input(raw: Any) -> str:
+    s = str(raw or "").strip().lower().replace(".", "")
+    if not s:
+        return ""
+    ampm = ""
+    if s.endswith("am") or s.endswith("pm"):
+        ampm = s[-2:]
+        s = s[:-2].strip()
+    elif s.endswith("a") or s.endswith("p"):
+        ampm = s[-1] + "m"
+        s = s[:-1].strip()
+    digits = "".join(ch for ch in s if ch.isdigit() or ch == ":")
+    if not digits:
+        return ""
+    try:
+        if ":" in digits:
+            h_s, m_s = digits.split(":", 1)
+            h, m = int(h_s or 0), int((m_s or "0")[:2].rjust(2, "0") or 0)
+        elif len(digits) <= 2:
+            h, m = int(digits), 0
+        elif len(digits) <= 4:
+            h, m = int(digits[:-2]), int(digits[-2:])
+        else:
+            return ""
+        if ampm == "am" and h == 12:
+            h = 0
+        elif ampm == "pm" and h < 12:
+            h += 12
+        if not 0 <= h <= 23 and 0 <= m <= 59:
+            return ""
+        return f"{h:02d}:{m:02d}"
+    except Exception:
+        return ""
+
+
+def active_blocks(now: datetime | None = None, override: str | None = None) -> tuple[str, list[str]]:
     data = load_schedules()
     if now is None:
         now = datetime.now()
@@ -631,17 +680,15 @@ def active_block(now: datetime | None = None, override: str | None = None) -> tu
     else:
         resolved = _resolve_today_entry(data, today_key, weekday)
         if resolved is None:
-            return "", ""
+            return "", []
         template_name, today_letter = resolved
 
-    # Use display blocks (insert-shift)
-    display_blocks = []
+    prof = "Block_A_Schedule" if today_letter == "A" else "Block_B_Schedule" if today_letter == "B" else "Block_A_Schedule"
     try:
         display_blocks = get_display_blocks(template_name)
     except Exception:
         display_blocks = []
     if not display_blocks:
-        # Fallback to raw templates/blocks
         templates = data.get("templates", {})
         blocks: list[dict[str, str]] = []
         if isinstance(templates, dict) and template_name in templates:
@@ -649,17 +696,16 @@ def active_block(now: datetime | None = None, override: str | None = None) -> tu
         else:
             blocks = data.get("blocks", [])
         t = now.strftime("%H:%M")
-        for b in sorted(blocks, key=lambda x: x.get("start", "")):
-            if b.get("start", "") <= t <= b.get("end", ""):
-                prof = "Block_A_Schedule" if today_letter == "A" else "Block_B_Schedule" if today_letter == "B" else "Block_A_Schedule"
-                return prof, str(b.get("name") or b.get("display_name") or "")
-        return "", ""
+        hits = [str(b.get("name") or b.get("display_name") or "") for b in sorted(blocks, key=lambda x: x.get("start", "")) if b.get("start", "") <= t <= b.get("end", "")]
+        return prof, [h for h in hits if h]
     t = now.strftime("%H:%M")
-    for b in display_blocks:
-        if b.get("start", "") <= t <= b.get("end", ""):
-            prof = "Block_A_Schedule" if today_letter == "A" else "Block_B_Schedule" if today_letter == "B" else "Block_A_Schedule"
-            return prof, b["display_name"]
-    return "", ""
+    hits = [b["display_name"] for b in display_blocks if b.get("start", "") <= t <= b.get("end", "")]
+    return prof, hits
+
+
+def active_block(now: datetime | None = None, override: str | None = None) -> tuple[str, str]:
+    prof, hits = active_blocks(now=now, override=override)
+    return prof, hits[0] if hits else ""
 
 
 def resolve_today_letter(now: datetime | None = None, override: str | None = None) -> str:

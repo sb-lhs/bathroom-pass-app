@@ -15,6 +15,7 @@ from .rosters import (
     PROFILE_A,
     PROFILE_B,
     VARIANTS,
+    create_block_roster,
     delete_block_roster,
     get_roster,
     get_roster_for_block,
@@ -32,7 +33,7 @@ from .rosters import (
     set_roster_for_block,
     set_roster_for_block_variant,
 )
-from .schedules import active_block, get_blocks, get_custom_days, get_date_overrides, get_templates, import_date_overrides_csv, import_date_overrides_ics, load_schedules, save_schedules, set_custom_day, set_date_overrides, set_templates, resolve_today_letter, list_school_presets, apply_school_preset, apply_school_preset_weekdays, export_school_preset, import_school_preset_file, fetch_remote_preset_index, fetch_and_install_remote_preset
+from .schedules import active_block, active_blocks, format_12h, get_blocks, get_custom_days, get_date_overrides, get_templates, import_date_overrides_csv, import_date_overrides_ics, load_schedules, parse_time_input, save_schedules, set_custom_day, set_date_overrides, set_templates, resolve_today_letter, list_school_presets, apply_school_preset, apply_school_preset_weekdays, export_school_preset, import_school_preset_file, fetch_remote_preset_index, fetch_and_install_remote_preset
 from .state_machine import PassStateMachine, PassType, State
 from .storage import Storage
 
@@ -67,6 +68,7 @@ class Backend(QObject):
 
         self._block_id = "Block 1"
         self._profile = "Block_A_Schedule"
+        self._active_blocks: list = []
         self._resolve_block()
 
         self.sm = PassStateMachine(self.cfg, self.storage, lambda: self._block_id)
@@ -123,10 +125,12 @@ class Backend(QObject):
             if getattr(self.cfg, "simple_mode", False):
                 self._profile = "Simple"
                 self._block_id = "Simple"
+                self._active_blocks = ["Simple"]
                 return
-            prof, blk = active_block(override=self.cfg.active_schedule_profile_override)
+            prof, hits = active_blocks(override=self.cfg.active_schedule_profile_override)
             self._profile = prof
-            self._block_id = blk
+            self._active_blocks = list(hits)
+            self._block_id = " + ".join(hits)
         except Exception:
             pass
 
@@ -140,15 +144,19 @@ class Backend(QObject):
                 return
             s = load_rosters_structured()
             letter = resolve_today_letter(override=self.cfg.active_schedule_profile_override)
-            if self._block_id in s:
-                variants = s[self._block_id]
-                if letter in variants and variants[letter]:
-                    self._roster_cache = list(variants[letter])
+            blocks = list(getattr(self, "_active_blocks", []) or ([self._block_id] if self._block_id else []))
+            seen: dict[str, str] = {}
+            for blk in blocks:
+                if blk in s:
+                    variants = s[blk]
+                    names = list(variants.get(letter, [])) if letter in variants and variants[letter] else list(variants.get("Everyday", []))
                 else:
-                    self._roster_cache = list(variants.get("Everyday", []))
-            else:
-                flat = load_rosters_flat()
-                self._roster_cache = list(flat.get(self._block_id, []))
+                    flat = load_rosters_flat()
+                    names = list(flat.get(blk, []))
+                for n in names:
+                    if n and n not in seen:
+                        seen[n] = n
+            self._roster_cache = list(seen.values())
             self._structured_rosters = s
             self._flat_rosters = load_rosters_flat()
             self._nested_rosters = load_rosters_nested()
@@ -181,6 +189,13 @@ class Backend(QObject):
     @Property(str, notify=activeBlockChanged)  # type: ignore
     def activeBlock(self) -> str:
         return self._block_id
+
+    @Property(list, notify=activeBlockChanged)  # type: ignore
+    def activeBlocks(self) -> list:
+        try:
+            return list(getattr(self, "_active_blocks", []))
+        except Exception:
+            return []
 
     @Property(str, notify=activeProfileChanged)  # type: ignore
     def activeProfile(self) -> str:
@@ -455,6 +470,22 @@ class Backend(QObject):
     def rosterVariants(self) -> list[str]:
         return list(VARIANTS)
 
+    @Property(list, notify=rosterChanged)  # type: ignore
+    def rosterNames(self) -> list:
+        try:
+            return sorted(load_rosters_structured().keys(), key=lambda n: str(n).lower())
+        except Exception:
+            return []
+
+    @Property(list, notify=rosterChanged)  # type: ignore
+    def blocksWithoutRosters(self) -> list:
+        try:
+            from .schedules import get_all_display_names
+            have = set(load_rosters_structured().keys())
+            return [n for n in get_all_display_names() if n not in have]
+        except Exception:
+            return []
+
     # A/B roster text (comma-separated) for QML binding — legacy compat
     def _roster_text(self, profile: str, block: str) -> str:
         try:
@@ -692,6 +723,63 @@ class Backend(QObject):
             self._roster_import_status = f"Save failed: {e}"
             self.rosterImportStatusChanged.emit(self._roster_import_status)
             return False
+
+    @Slot(str, result=bool)
+    def createRoster(self, name: str) -> bool:
+        try:
+            ok = create_block_roster(name.strip())
+            if ok:
+                self._update_roster_cache()
+                self.rosterChanged.emit()
+                self._roster_import_status = f"Created roster {name.strip()}"
+            else:
+                self._roster_import_status = "Name taken or blank"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return ok
+        except Exception as e:
+            self._roster_import_status = f"Create failed: {e}"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return False
+
+    @Slot(str, result=bool)
+    def deleteRoster(self, name: str) -> bool:
+        try:
+            delete_block_roster(name.strip())
+            self._update_roster_cache()
+            self.rosterChanged.emit()
+            self._roster_import_status = f"Deleted roster {name.strip()}"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return True
+        except Exception as e:
+            self._roster_import_status = f"Delete failed: {e}"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return False
+
+    @Slot(str, str, result=bool)
+    def renameRoster(self, oldName: str, newName: str) -> bool:
+        try:
+            if not newName.strip() or oldName.strip() == newName.strip():
+                return False
+            rename_block_roster(oldName.strip(), newName.strip())
+            self._update_roster_cache()
+            self.rosterChanged.emit()
+            return True
+        except Exception:
+            return False
+
+    @Slot(str, result=str)
+    def parseTimeInput(self, text: str) -> str:
+        try:
+            return parse_time_input(text)
+        except Exception:
+            return ""
+
+    @Slot(str, result=str)
+    def formatTime12h(self, hhmm: str) -> str:
+        try:
+            return format_12h(hhmm)
+        except Exception:
+            return str(hhmm or "")
 
     @Slot(bool, result=bool)
     def setSimpleMode(self, enabled: bool) -> bool:
@@ -967,13 +1055,13 @@ class Backend(QObject):
                 self._roster_import_status = f"Block '{n}' already in {tname}"
                 self.rosterImportStatusChanged.emit(self._roster_import_status)
                 return False
-            def ok(x: str) -> bool:
-                try: h,m = x.strip().split(":"); return 0 <= int(h) <=23 and 0 <= int(m) <=59
-                except: return False
-            if not ok(start) or not ok(end):
-                self._roster_import_status = "Use HH:MM"
+            start_n = parse_time_input(start)
+            end_n = parse_time_input(end)
+            if not start_n or not end_n:
+                self._roster_import_status = "Use times like 8:30 AM"
                 self.rosterImportStatusChanged.emit(self._roster_import_status)
                 return False
+            start, end = start_n, end_n
             raw_name = "" if not n or n.lower().startswith("block ") and n[6:].strip().isdigit() else n
             # Treat Block N as auto
             from .schedules import _is_auto_name as _is_auto
@@ -1038,7 +1126,9 @@ class Backend(QObject):
             old_display = old
             # Capture old raw for roster rename if custom
             old_raw = (t[tname][idx].get("name") or "").strip()
-            t[tname][idx] = {"name": nn, "start": start.strip(), "end": end.strip()}
+            start_n = parse_time_input(start) or str(t[tname][idx].get("start", "08:00"))
+            end_n = parse_time_input(end) or str(t[tname][idx].get("end", "09:30"))
+            t[tname][idx] = {"name": nn, "start": start_n, "end": end_n}
             t[tname] = sorted(t[tname], key=lambda x: x["start"])
             set_templates(t)
             # Roster migration only for custom renames (not auto shift)
@@ -1101,6 +1191,7 @@ class Backend(QObject):
             self.scheduleChanged.emit()
             self._resolve_block()
             self.activeBlockChanged.emit(self._block_id)
+            self.rosterChanged.emit()
             return True
         except Exception as e:
             self._roster_import_status = f"Delete failed: {e}"
