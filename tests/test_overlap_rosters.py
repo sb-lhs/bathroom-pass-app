@@ -99,6 +99,17 @@ def test_flip_all_everyday_noop():
         })
         assert S.flip_weekday_letters() == 0
 
+def test_roster_rename():
+    with tempfile.TemporaryDirectory() as tmp:
+        _isolate(tmp)
+        from hallpass.rosters import create_block_roster, load_rosters_structured, rename_block_roster, set_roster_for_block_variant
+        assert create_block_roster("Chem Lab") is True
+        set_roster_for_block_variant("Chem Lab", "A", ["Zoe"])
+        rename_block_roster("Chem Lab", "Physics Lab")
+        s = load_rosters_structured()
+        assert "Chem Lab" not in s
+        assert s["Physics Lab"]["A"] == ["Zoe"]
+
 def test_roster_create_delete():
     with tempfile.TemporaryDirectory() as tmp:
         _isolate(tmp)

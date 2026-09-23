@@ -1051,13 +1051,26 @@ Dialog {
                                     anchors.fill: parent
                                     anchors.margins: 14
                                     spacing: 10
-                                    Label { text: blockName
+                                    TextField { id: rosterNameField
+                                        text: blockName
                                         color: "#1e3a5f"
                                         font.bold: true
                                         font.pixelSize: 14
                                         Layout.fillWidth: true
-                                        elide: Text.ElideRight
-                                        wrapMode: Text.NoWrap }
+                                        selectByMouse: true
+                                        background: Rectangle { color: "transparent"; border.color: rosterNameField.activeFocus ? "#1e3a5f" : "transparent"; radius: 4 }
+                                        onEditingFinished: {
+                                            if (text.trim() !== "" && text.trim() !== blockName) {
+                                                var m = admin.rosterDirty
+                                                m[blockName + ":Everyday"] = false
+                                                m[blockName + ":A"] = false
+                                                m[blockName + ":B"] = false
+                                                admin.rosterDirty = m
+                                                backend.renameRoster(blockName, text.trim())
+                                            } else {
+                                                text = blockName
+                                            }
+                                        } }
                                     RowLayout {
                                         spacing: 10
                                         Layout.fillWidth: true
