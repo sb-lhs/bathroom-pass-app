@@ -237,11 +237,12 @@ Dialog {
                     Layout.fillWidth: true
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 150
+                        Layout.preferredHeight: schedHeaderCol.implicitHeight + 32
                         radius: 4
                         color: "#ffffff"
                         border.color: "#d1d5db"
                         ColumnLayout {
+                            id: schedHeaderCol
                             anchors.fill: parent
                             anchors.margins: 16
                             spacing: 12
@@ -256,17 +257,7 @@ Dialog {
                                     color: "#1e3a5f"
                                     font.pixelSize: 15
                                     font.bold: true }
-                                Label { text: "• Unlimited custom blocks"
-                                    color: "#334155"
-                                    font.pixelSize: 12 }
                                 Item { Layout.fillWidth: true }
-                            }
-                            Label {
-                                text: "Create any number of blocks, name them, set times, and tag as Everyday (daily) or A/B (alternating). Rosters are per-block and the active roster is chosen by the current time on this device."
-                                color: "#475569"
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
-                                font.pixelSize: 12
                             }
                             RowLayout {
                                 spacing: 10
@@ -319,11 +310,12 @@ Dialog {
                     }
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 170
+                        Layout.preferredHeight: simpleModeCol.implicitHeight + 32
                         radius: 4
                         color: backend.simpleMode ? "#eff6ff" : "#ffffff"
                         border.color: backend.simpleMode ? "#3b82f6" : "#d1d5db"
                         ColumnLayout {
+                            id: simpleModeCol
                             anchors.fill: parent
                             anchors.margins: 16
                             spacing: 10
@@ -336,13 +328,6 @@ Dialog {
                                     Binding on checked { value: backend ? backend.simpleMode : false }
                                     onToggled: backend.setSimpleMode(checked)
                                 }
-                            }
-                            Label {
-                                text: "When on, the bell schedule and A/B sorting are hidden — one roster shows for the whole day. Works for any school size or sorting."
-                                color: "#475569"
-                                font.pixelSize: 11
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
                             }
                             RowLayout {
                                 Layout.fillWidth: true
@@ -368,23 +353,19 @@ Dialog {
                     }
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 460
+                        Layout.preferredHeight: weekdaySchedCol.implicitHeight + 32
                         radius: 4
                         color: "#ffffff"
                         border.color: "#d1d5db"
                         ColumnLayout {
+                            id: weekdaySchedCol
                             anchors.fill: parent
                             anchors.margins: 16
                             spacing: 10
-                            Label { text: "Weekday → Bell Template + Day Letter (set-and-forget)"
+                            Label { text: "Weekday Schedule"
                                     color: "#1e3a5f"
                                     font.bold: true
                                     font.pixelSize: 13
-                                    Layout.fillWidth: true }
-                            Label { text: "Which bell times + Everyday/A/B each weekday uses when no date override. Keep all Regular/Everyday, or set Wednesday to Late Start/A etc. Letter picks which roster variant shows."
-                                    color: "#475569"
-                                    font.pixelSize: 11
-                                    wrapMode: Text.WordWrap
                                     Layout.fillWidth: true }
                             GridLayout {
                                 columns: 1
@@ -424,8 +405,7 @@ Dialog {
                                 }
                             }
                             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#e2e8f0" }
-                            Label { text: "Custom Day (overrides calendar & weekday)"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
-                            Label { text: "One-off: e.g. 2026-09-03 → B or Regular Wednesday:A. Custom abrogates calendar."; color: "#64748b"; font.pixelSize: 10; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                            Label { text: "Custom Day"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
                             RowLayout {
                                 spacing: 8
                                 Layout.fillWidth: true
@@ -454,7 +434,7 @@ Dialog {
                                     onClicked: if (customDateField.text.length === 10) backend.clearCustomDay(customDateField.text)
                                 }
                             }
-                            Label { text: "Calendar Import — source of truth (replaces all dates)"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
+                            Label { text: "Calendar Import"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
                             RowLayout {
                                 spacing: 8
                                 Layout.fillWidth: true
@@ -509,14 +489,13 @@ Dialog {
                                 spacing: 8
                                 Layout.fillWidth: true
                                 Rectangle { color: "#1e3a5f"; radius: 4; Layout.preferredWidth: 4; Layout.preferredHeight: 16 }
-                                Label { text: "Bell Templates — Manual Schedule (no import needed)"
+                                Label { text: "Bell Templates"
                                     color: "#1e3a5f"
                                     font.bold: true
                                     font.pixelSize: 14
                                     Layout.fillWidth: true }
                                 Label { text: Object.keys(backend.templates).length + " templates"; color: "#475569"; font.pixelSize: 11 }
                             }
-                            Label { text: "Create any bell schedule — Regular, Wednesday, Half Day, etc. Each template has its own blocks/times. Pick the weekday template above to use it without any calendar file. Names are yours — not baked in."; color: "#475569"; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 11 }
                             RowLayout {
                                 spacing: 8
                                 Layout.fillWidth: true
@@ -807,13 +786,6 @@ Dialog {
                                 Label { text: backend.getAllBlockNames().length + " blocks (detached — assign to any Block name)"
                                     color: "#475569"
                                     font.pixelSize: 11 }
-                            }
-                            Label {
-                                text: "Each block shows 3 rosters: Everyday (daily, used when A/B empty) and A/B (shown when weekday letter is A/B). Rosters are detached — they live on the Block name, not on times. Times → Block N via position (insert-shift)."
-                                color: "#475569"
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
-                                font.pixelSize: 12
                             }
                             Label { text: backend ? backend.rosterImportStatus : ""
                                     color: backend.rosterImportStatus.indexOf("failed")>=0 ? "#991b1b" : "#14532d"
@@ -1172,7 +1144,7 @@ Dialog {
                                 Label { text: "Photo Audit — Weekly Auto-Delete"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 15; Layout.fillWidth: true }
                                 Label { text: "7 days"; color: "#475569"; font.pixelSize: 11 }
                             }
-                            Label { text: "Silent photos on pass out/in. Stored in " + backend.photosFolder + ". Auto-deleted after 7 days (daily check on launch). Use Refresh to reload, Purge to delete immediately, or Reveal to open folder."; color: "#475569"; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                            Label { text: backend.photosFolder; color: "#475569"; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true; elide: Text.ElideMiddle }
                             Label { text: backend.photosStatus; color: backend.photosStatus.indexOf("failed")>=0 ? "#991b1b" : "#14532d"; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 11; visible: backend.photosStatus !== "" }
                         }
                     }
@@ -1267,7 +1239,6 @@ Dialog {
                                         onClicked: backend.openCameraSettings()
                                     }
                                 }
-                                Label { text: "Pick the camera facing the student at the screen. First login shows picker if multiple."; color: "#7f1d1d"; font.pixelSize: 9; Layout.fillWidth: true; wrapMode: Text.WordWrap }
                             }
                         }
                     }
@@ -1374,9 +1345,7 @@ Dialog {
                                     Layout.fillWidth: true
                                     Rectangle { color: "#1e3a5f"; radius: 4; Layout.preferredWidth: 4; Layout.preferredHeight: 14 }
                                     Label { text: "Alarm Sound"; color: "#1e293b"; font.bold: true; font.pixelSize: 13; Layout.fillWidth: true }
-                                    Label { text: "Overtime alarm"; color: "#475569"; font.pixelSize: 11 }
                                 }
-                                Label { text: "Sound played when timer hits OVERTIME"; color: "#475569"; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                                 ComboBox { id: soundBox
                                     model: backend ? backend.alarmSounds : []; Component.onCompleted: if (backend) currentIndex = backend.alarmSounds.indexOf(backend.selectedAlarmSound)
                                     Layout.fillWidth: true
@@ -1422,7 +1391,6 @@ Dialog {
                                     Label { text: "Offline TTS"; color: "#1e293b"; font.bold: true; font.pixelSize: 13; Layout.fillWidth: true }
                                     Rectangle { color: ttsSwitch.checked ? "#14532d" : "#64748b"; radius: 8; Layout.preferredWidth: 44; Layout.preferredHeight: 18; Label { anchors.centerIn: parent; text: ttsSwitch.checked ? "On" : "Off"; color: "white"; font.pixelSize: 10; font.bold: true } }
                                 }
-                                Label { text: "Announcements when queue advances"; color: "#475569"; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                                 RowLayout {
                                     spacing: 10
                                     Layout.fillWidth: true
@@ -1430,7 +1398,7 @@ Dialog {
                                     Switch { id: ttsSwitch
                                         checked: backend ? backend.ttsEnabled : true; onToggled: backend.setTtsEnabled(checked) }
                                 }
-                                Label { text: "speech-dispatcher / espeak-ng • 100% offline"; color: "#475569"; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.WordWrap; elide: Text.ElideRight }
+                                Label { text: "100% offline"; color: "#475569"; font.pixelSize: 11; Layout.fillWidth: true; elide: Text.ElideRight }
                             }
                         }
                     }
@@ -1472,11 +1440,6 @@ Dialog {
                                     color: "#475569"
                                     font.pixelSize: 11 }
                                 }
-                                Label { text: "How long before OVERTIME alarm"
-                                    color: "#475569"
-                                    font.pixelSize: 11
-                                    wrapMode: Text.WordWrap
-                                    Layout.fillWidth: true }
                                 RowLayout {
                                     spacing: 12
                                     Layout.fillWidth: true
@@ -1554,11 +1517,6 @@ Dialog {
                                     color: "#475569"
                                     font.pixelSize: 11 }
                                 }
-                                Label { text: "Shorter limit — independent from Bathroom"
-                                    color: "#475569"
-                                    font.pixelSize: 11
-                                    wrapMode: Text.WordWrap
-                                    Layout.fillWidth: true }
                                 RowLayout {
                                     spacing: 12
                                     Layout.fillWidth: true

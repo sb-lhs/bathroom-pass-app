@@ -147,20 +147,12 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             elide: Text.ElideRight
                         }
-                        Label {
-                            text: "Tap name to choose pass type"
-                            color: "#334155"
-                            font.family: "Source Sans Pro"
-                            font.pixelSize: 12
-                            font.italic: true
-                            Layout.fillWidth: true
-                        }
                         // Pass type selector modal
                         PassTypeDialog { id: passDialog }
                         Rectangle { Layout.fillWidth: true; height: 1; color: "#e5e7eb"; Layout.topMargin: 8 }
                         Label {
                             visible: roster.length === 0
-                            text: activeBlock === "" ? "No block scheduled for now\nRoster appears only during its time slot" : "No students in this block"
+                            text: activeBlock === "" ? "No block scheduled" : "No students"
                             color: "#64748b"
                             font.family: "Source Sans Pro"
                             font.pixelSize: 13
@@ -182,20 +174,20 @@ ApplicationWindow {
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     model: roster
-                    spacing: 10
+                    spacing: 12
                     delegate: Rectangle {
                         width: rosterView.width
-                        height: 68
-                        radius: 6
+                        height: 96
+                        radius: 8
                         color: "#f8f9fa"
-                        border.color: "#e5e7eb"
-                        border.width: 1
+                        border.color: "#cbd5e1"
+                        border.width: 2
                         Text {
                             anchors.centerIn: parent
                             text: modelData
                             color: "#1e293b"
                             font.family: "Source Sans Pro"
-                            font.pixelSize: 16
+                            font.pixelSize: 20
                             font.bold: true
                         }
                         MouseArea {
@@ -459,7 +451,7 @@ ApplicationWindow {
                     Label {
                         anchors.centerIn: parent
                         visible: passHistory.length === 0
-                        text: "No passes yet — history will appear here"
+                        text: "No passes yet"
                         color: "#64748b"
                         font.family: "Source Sans Pro"
                         font.pixelSize: 12
