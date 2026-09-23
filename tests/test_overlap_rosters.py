@@ -69,6 +69,36 @@ def test_time_parse_and_format():
         assert format_12h("13:30") == "1:30 PM"
         assert format_12h("00:00") == "12:00 AM"
 
+def test_flip_weekday_letters():
+    with tempfile.TemporaryDirectory() as tmp:
+        _isolate(tmp)
+        from hallpass import schedules as S
+        S.save_schedules({
+            "blocks": S.default_blocks(),
+            "templates": {"Regular": S.default_blocks()},
+            "weekday_templates": {w: "Regular" for w in S.WEEKDAYS},
+            "weekday_letters": {"Monday": "A", "Tuesday": "B", "Wednesday": "Everyday", "Thursday": "A", "Friday": "B", "Saturday": "Everyday", "Sunday": "Everyday"},
+        })
+        assert S.flip_weekday_letters() == 4
+        after = S.load_schedules()["weekday_letters"]
+        assert after["Monday"] == "B" and after["Tuesday"] == "A"
+        assert after["Wednesday"] == "Everyday"
+        assert S.flip_weekday_letters() == 4
+        back = S.load_schedules()["weekday_letters"]
+        assert back["Monday"] == "A" and back["Tuesday"] == "B"
+
+def test_flip_all_everyday_noop():
+    with tempfile.TemporaryDirectory() as tmp:
+        _isolate(tmp)
+        from hallpass import schedules as S
+        S.save_schedules({
+            "blocks": S.default_blocks(),
+            "templates": {"Regular": S.default_blocks()},
+            "weekday_templates": {w: "Regular" for w in S.WEEKDAYS},
+            "weekday_letters": {w: "Everyday" for w in S.WEEKDAYS},
+        })
+        assert S.flip_weekday_letters() == 0
+
 def test_roster_create_delete():
     with tempfile.TemporaryDirectory() as tmp:
         _isolate(tmp)

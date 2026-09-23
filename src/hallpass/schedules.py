@@ -758,6 +758,28 @@ def set_weekday_letter(weekday: str, letter: str) -> None:
     save_schedules(data)
 
 
+def flip_weekday_letters() -> int:
+    data = load_schedules()
+    wl = data.get("weekday_letters", {})
+    if not isinstance(wl, dict):
+        wl = {}
+    flipped = 0
+    for wd in WEEKDAYS:
+        cur = _norm_day_type(wl.get(wd, "Everyday"))
+        if cur == "A":
+            wl[wd] = "B"
+            flipped += 1
+        elif cur == "B":
+            wl[wd] = "A"
+            flipped += 1
+        else:
+            wl[wd] = "Everyday"
+    data["weekday_letters"] = dict(wl)
+    data["day_defaults"] = dict(wl)
+    save_schedules(data)
+    return flipped
+
+
 def get_templates() -> dict[str, list[dict[str, str]]]:
     return load_schedules().get("templates", {"Regular": default_blocks()})
 

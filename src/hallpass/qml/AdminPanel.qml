@@ -365,11 +365,23 @@ Dialog {
                             anchors.fill: parent
                             anchors.margins: 16
                             spacing: 10
-                            Label { text: "Weekday Schedule"
-                                    color: "#1e3a5f"
-                                    font.bold: true
-                                    font.pixelSize: 13
-                                    Layout.fillWidth: true }
+                            RowLayout {
+                                spacing: 8
+                                Layout.fillWidth: true
+                                Label { text: "Weekday Schedule"
+                                        color: "#1e3a5f"
+                                        font.bold: true
+                                        font.pixelSize: 13
+                                        Layout.fillWidth: true }
+                                Button {
+                                    text: "Flip A↔B"
+                                    Layout.preferredWidth: 90
+                                    Layout.preferredHeight: 32
+                                    background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#1e3a5f"; border.width: 1 }
+                                    contentItem: Text { text: parent.text; color: "#1e3a5f"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                    onClicked: backend.flipWeekdayLetters()
+                                }
+                            }
                             GridLayout {
                                 columns: 1
                                 columnSpacing: 12

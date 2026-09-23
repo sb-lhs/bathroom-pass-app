@@ -33,7 +33,7 @@ from .rosters import (
     set_roster_for_block,
     set_roster_for_block_variant,
 )
-from .schedules import active_block, active_blocks, format_12h, get_blocks, get_custom_days, get_date_overrides, get_templates, import_date_overrides_csv, import_date_overrides_ics, load_schedules, parse_time_input, save_schedules, set_custom_day, set_date_overrides, set_templates, resolve_today_letter, list_school_presets, apply_school_preset, apply_school_preset_weekdays, export_school_preset, import_school_preset_file, fetch_remote_preset_index, fetch_and_install_remote_preset
+from .schedules import active_block, active_blocks, flip_weekday_letters, format_12h, get_blocks, get_custom_days, get_date_overrides, get_templates, import_date_overrides_csv, import_date_overrides_ics, load_schedules, parse_time_input, save_schedules, set_custom_day, set_date_overrides, set_templates, resolve_today_letter, list_school_presets, apply_school_preset, apply_school_preset_weekdays, export_school_preset, import_school_preset_file, fetch_remote_preset_index, fetch_and_install_remote_preset
 from .state_machine import PassStateMachine, PassType, State
 from .storage import Storage
 
@@ -1225,6 +1225,24 @@ class Backend(QObject):
             return True
         except Exception:
             return False
+
+    @Slot(result=int)
+    def flipWeekdayLetters(self) -> int:
+        try:
+            n = flip_weekday_letters()
+            if n:
+                self._roster_import_status = f"Flipped {n} day(s) A↔B"
+            else:
+                self._roster_import_status = "No A/B days to flip"
+            self.scheduleChanged.emit()
+            self._resolve_block()
+            self._update_roster_cache()
+            self.activeBlockChanged.emit(self._block_id)
+            self.rosterChanged.emit()
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return n
+        except Exception:
+            return 0
 
     @Slot(str, str, result=bool)
     def setDateTemplate(self, date_str: str, template: str) -> bool:
