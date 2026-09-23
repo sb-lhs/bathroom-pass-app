@@ -28,7 +28,7 @@ python -m hallpass
 ## Install on Debian (Surface Pro, one command)
 On the device, run (replace `0.3.0` with the release you want):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sb-lhs/bathroom-pass-app/v0.3.0/scripts/install_debian.sh | sudo bash -s -- 0.3.0
+curl -fsSL https://raw.githubusercontent.com/sb-lhs/bathroom-pass-app/main/scripts/install_debian.sh | sudo bash -s -- 0.3.0
 ```
 This installs system dependencies, builds `hallpass-qt_0.3.0_amd64.deb` from the
 tagged source on-device, and installs it with `apt` (dependencies resolve from
