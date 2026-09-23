@@ -16,6 +16,8 @@ ApplicationWindow {
     property string stateMode: backend ? backend.stateMode : "IDLE"
     property string activeStudent: backend ? backend.activeStudent : ""
     property string activePassType: backend ? backend.activePassType : ""
+    property string selectedStudent: ""
+    onActiveBlockChanged: selectedStudent = ""
     property int elapsedSeconds: backend ? backend.elapsedSeconds : 0
     property int thresholdSeconds: backend ? backend.thresholdSeconds : 420
     property bool alarmMuted: backend ? backend.alarmMuted : false
@@ -142,25 +144,89 @@ ApplicationWindow {
                             text: activeBlock !== "" ? "Roster — " + activeBlock : "No active block — outside scheduled times"
                             color: "#1e3a5f"
                             font.family: "Libre Baskerville"
-                            font.pixelSize: 17
+                            font.pixelSize: 32
                             font.bold: true
                             Layout.fillWidth: true
                             elide: Text.ElideRight
                         }
-                        // Pass type selector modal
-                        PassTypeDialog { id: passDialog }
                         Rectangle { Layout.fillWidth: true; height: 1; color: "#e5e7eb"; Layout.topMargin: 8 }
                         Label {
                             visible: roster.length === 0
                             text: activeBlock === "" ? "No block scheduled" : "No students"
                             color: "#64748b"
                             font.family: "Source Sans Pro"
-                            font.pixelSize: 13
+                            font.pixelSize: 26
                             font.italic: true
                             wrapMode: Text.WordWrap
                             horizontalAlignment: Text.AlignHCenter
                             Layout.fillWidth: true
                             Layout.topMargin: 16
+                        }
+                    }
+                }
+                // Selected-student pass panel — big Bathroom/Water buttons across the column
+                Rectangle {
+                    visible: root.selectedStudent !== ""
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: passPanelCol.implicitHeight + 24
+                    radius: 8
+                    color: "#1e3a5f"
+                    ColumnLayout {
+                        id: passPanelCol
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 10
+                        Label {
+                            text: root.selectedStudent
+                            color: "#ffffff"
+                            font.family: "Libre Baskerville"
+                            font.pixelSize: 30
+                            font.bold: true
+                            horizontalAlignment: Text.AlignHCenter
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+                        Button {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 100
+                            text: {
+                                var sec = backend ? backend.bathroomThreshold : 420
+                                var m = Math.floor(sec/60)
+                                var s = sec % 60
+                                return "Bathroom (" + m + " min" + (s ? " " + s + " sec" : "") + ")"
+                            }
+                            font.family: "Source Sans Pro"
+                            font.pixelSize: 28
+                            font.bold: true
+                            background: Rectangle { color: "#ffffff"; radius: 6 }
+                            contentItem: Text { text: parent.text; color: "#1e3a5f"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "Source Sans Pro"; font.pixelSize: 28; font.bold: true }
+                            onClicked: { if (backend.stateMode !== "IDLE") backend.enqueue(root.selectedStudent, "Bathroom"); else backend.selectStudent(root.selectedStudent, "Bathroom"); root.selectedStudent = "" }
+                        }
+                        Button {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 100
+                            text: {
+                                var sec = backend ? backend.waterThreshold : 180
+                                var m = Math.floor(sec/60)
+                                var s = sec % 60
+                                return "Water (" + m + " min" + (s ? " " + s + " sec" : "") + ")"
+                            }
+                            font.family: "Source Sans Pro"
+                            font.pixelSize: 28
+                            font.bold: true
+                            background: Rectangle { color: "#ffffff"; radius: 6 }
+                            contentItem: Text { text: parent.text; color: "#14532d"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "Source Sans Pro"; font.pixelSize: 28; font.bold: true }
+                            onClicked: { if (backend.stateMode !== "IDLE") backend.enqueue(root.selectedStudent, "Water"); else backend.selectStudent(root.selectedStudent, "Water"); root.selectedStudent = "" }
+                        }
+                        Button {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 48
+                            text: "Cancel"
+                            font.family: "Source Sans Pro"
+                            font.pixelSize: 22
+                            background: Rectangle { color: "transparent"; radius: 6; border.color: "#ffffff"; border.width: 1 }
+                            contentItem: Text { text: parent.text; color: "#ffffff"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "Source Sans Pro"; font.pixelSize: 22 }
+                            onClicked: root.selectedStudent = ""
                         }
                     }
                 }
@@ -177,24 +243,27 @@ ApplicationWindow {
                     spacing: 12
                     delegate: Rectangle {
                         width: rosterView.width
-                        height: 96
+                        height: 120
                         radius: 8
-                        color: "#f8f9fa"
-                        border.color: "#cbd5e1"
+                        color: root.selectedStudent === modelData ? "#dbeafe" : "#f8f9fa"
+                        border.color: root.selectedStudent === modelData ? "#1e3a5f" : "#cbd5e1"
                         border.width: 2
                         Text {
                             anchors.centerIn: parent
+                            width: parent.width - 24
+                            horizontalAlignment: Text.AlignHCenter
+                            elide: Text.ElideMiddle
                             text: modelData
                             color: "#1e293b"
                             font.family: "Source Sans Pro"
-                            font.pixelSize: 20
+                            font.pixelSize: 38
                             font.bold: true
                         }
                         MouseArea {
                             anchors.fill: parent
                             onClicked: {
-                                passDialog.student = modelData
-                                passDialog.open()
+                                if (root.selectedStudent === modelData) root.selectedStudent = ""
+                                else root.selectedStudent = modelData
                             }
                         }
                     }
@@ -218,7 +287,7 @@ ApplicationWindow {
                     text: stateMode==="IDLE" ? "IDLE" : (activePassType + " PASS")
                     color: "#1e3a5f"
                     font.family: "Libre Baskerville"
-                    font.pixelSize: 16
+                    font.pixelSize: 30
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
@@ -227,7 +296,7 @@ ApplicationWindow {
                     text: activeStudent || "Select a student"
                     color: activeStudent?"#1e293b":"#64748b"
                     font.family: "Libre Baskerville"
-                    font.pixelSize: 26
+                    font.pixelSize: 48
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
@@ -245,7 +314,7 @@ ApplicationWindow {
                     }
                     color: stateMode==="OVERTIME"?"#991b1b":"#334155"
                     font.family: "Source Sans Pro"
-                    font.pixelSize: 42
+                    font.pixelSize: 76
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
@@ -261,7 +330,7 @@ ApplicationWindow {
                     text: stateMode==="OVERTIME" ? "OVERTIME — Return pass now" : ""
                     color: "#991b1b"
                     font.family: "Source Sans Pro"
-                    font.pixelSize: 13
+                    font.pixelSize: 26
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
@@ -277,7 +346,7 @@ ApplicationWindow {
                     Layout.minimumHeight: 96
                     text: "Return Pass"
                     font.family: "Source Sans Pro"
-                    font.pixelSize: 22
+                    font.pixelSize: 40
                     font.bold: true
                     enabled: stateMode!=="IDLE"
                     background: Rectangle {
@@ -293,7 +362,7 @@ ApplicationWindow {
                     height: 48
                     text: alarmMuted ? "Alarm Muted" : "Mute Alarm"
                     font.family: "Source Sans Pro"
-                    font.pixelSize: 14
+                    font.pixelSize: 26
                     visible: stateMode==="OVERTIME"
                     enabled: !alarmMuted
                     background: Rectangle {
@@ -322,7 +391,7 @@ ApplicationWindow {
                     text: "Queue"
                     color: "#1e3a5f"
                     font.family: "Libre Baskerville"
-                    font.pixelSize: 18
+                    font.pixelSize: 34
                     font.bold: true
                 }
                 ListView {
@@ -333,7 +402,7 @@ ApplicationWindow {
                     spacing: 8
                     delegate: Rectangle {
                         width: queueView.width
-                        height: 60
+                        height: 96
                         radius: 6
                         color: "#f8f9fa"
                         border.color: "#e5e7eb"
@@ -346,7 +415,7 @@ ApplicationWindow {
                                 text: (index+1)+". "+modelData.name
                                 color: "#1e293b"
                                 font.family: "Source Sans Pro"
-                                font.pixelSize: 15
+                                font.pixelSize: 28
                                 font.bold: true
                                 Layout.fillWidth: true
                                 elide: Text.ElideRight
@@ -355,15 +424,15 @@ ApplicationWindow {
                                 text: modelData.passType
                                 color: "#334155"
                                 font.family: "Source Sans Pro"
-                                font.pixelSize: 11
+                                font.pixelSize: 20
                                 font.italic: true
                             }
                             Button {
                                 text: "✕"
-                                Layout.preferredWidth: 32
-                                Layout.preferredHeight: 32
+                                Layout.preferredWidth: 52
+                                Layout.preferredHeight: 52
                                 background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#fecaca"; border.width: 1 }
-                                contentItem: Text { text: parent.text; color: "#991b1b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 14; font.bold: true }
+                                contentItem: Text { text: parent.text; color: "#991b1b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 26; font.bold: true }
                                 onClicked: backend.cancelQueue(modelData.name)
                             }
                         }
