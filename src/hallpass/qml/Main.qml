@@ -25,27 +25,15 @@ ApplicationWindow {
     property var roster: backend ? backend.roster : []
     property var passHistory: backend ? backend.passHistory : []
 
-    // Full-screen overdue flash (red/yellow)
+    // Full-screen overdue tint (static — cheap) + blinking banner below
     Rectangle {
         id: flashOverlay
         anchors.fill: parent
         color: "#991b1b"
-        opacity: 0
+        opacity: 0.22
         visible: stateMode === "OVERTIME"
         z: 100
-        SequentialAnimation on opacity {
-            running: flashOverlay.visible
-            loops: Animation.Infinite
-            NumberAnimation { from: 0.0; to: 0.35; duration: 450; easing.type: Easing.InOutQuad }
-            NumberAnimation { from: 0.35; to: 0.0; duration: 450; easing.type: Easing.InOutQuad }
-        }
-        SequentialAnimation on color {
-            running: flashOverlay.visible
-            loops: Animation.Infinite
-            ColorAnimation { from: "#991b1b"; to: "#facc15"; duration: 450 }
-            ColorAnimation { from: "#facc15"; to: "#991b1b"; duration: 450 }
-        }
-        // Ensure clicks pass through when flashing
+        // Ensure clicks pass through
         MouseArea { anchors.fill: parent; enabled: false }
     }
 
@@ -327,14 +315,22 @@ ApplicationWindow {
                     visible: stateMode!=="IDLE"
                 }
                 Label {
+                    id: overtimeBanner
                     text: stateMode==="OVERTIME" ? "OVERTIME — Return pass now" : ""
-                    color: "#991b1b"
+                    color: "#ffffff"
                     font.family: "Source Sans Pro"
                     font.pixelSize: 26
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
                     visible: stateMode==="OVERTIME"
+                    SequentialAnimation on opacity {
+                        running: overtimeBanner.visible
+                        loops: Animation.Infinite
+                        NumberAnimation { from: 1.0; to: 0.2; duration: 500 }
+                        NumberAnimation { from: 0.2; to: 1.0; duration: 500 }
+                    }
+                    background: Rectangle { color: "#991b1b"; radius: 6 }
                 }
 
                 Item { Layout.fillHeight: true; visible: stateMode==="IDLE" }

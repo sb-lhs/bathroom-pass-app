@@ -58,9 +58,9 @@ class Backend(QObject):
         super().__init__()
         self.cfg: AppConfig = load_config()
         self.storage = Storage()
-        self.camera = SilentCamera(warm=True, camera_index=int(getattr(self.cfg, "selected_camera_index", 0)))
+        self.camera = SilentCamera(warm=False, camera_index=int(getattr(self.cfg, "selected_camera_index", 0)))
         self.alarm = AlarmService()
-        self.tts = TTSService()
+        self._tts = None
         self.alarm.set_sound(self.cfg.selected_alarm_sound)
 
         self._block_id = "Block 1"
@@ -75,6 +75,7 @@ class Backend(QObject):
 
         # Timer
         self._elapsed = 0
+        self._tick_count = 0
         self._ticker = QTimer(self)
         self._ticker.setInterval(1000)
         self._ticker.timeout.connect(self._tick)
@@ -86,11 +87,7 @@ class Backend(QObject):
         self._photos_status = ""
         self._password_status = ""
         self._alarm_test_status = ""
-        # Auto-purge photos older than 7 days on startup
-        try:
-            self._purge_old_photos_internal(days=7)
-        except Exception:
-            pass
+        QTimer.singleShot(1000, self._deferred_startup)
         # Daily timer for weekly autodelete
         self._photos_timer = QTimer(self)
         self._photos_timer.setInterval(24*60*60*1000)
@@ -99,6 +96,24 @@ class Backend(QObject):
 
         # Resolve roster for current block
         self._update_roster_cache()
+
+    def _deferred_startup(self) -> None:
+        try:
+            self.camera.warm()
+        except Exception:
+            pass
+        try:
+            self._purge_old_photos_internal(days=7)
+        except Exception:
+            pass
+
+    def _get_tts(self):
+        if self._tts is None:
+            try:
+                self._tts = TTSService()
+            except Exception:
+                self._tts = None
+        return self._tts
 
     def _resolve_block(self) -> None:
         try:
@@ -415,9 +430,7 @@ class Backend(QObject):
     def passHistory(self) -> list[dict]:
         try:
             # Recent 20, newest first
-            logs = self.storage.get_logs()
-            # last 20 reversed
-            recent = logs[-20:][::-1]
+            recent = self.storage.get_recent_logs(20)[::-1]
             out=[]
             for r in recent:
                 # Format times as HH:MM
@@ -1270,9 +1283,21 @@ class Backend(QObject):
     @Property(list, notify=configChanged)  # type: ignore
     def availableCameraIndices(self) -> list[int]:
         try:
-            return self.camera.available_indices(force_probe=True)
+            return self.camera.available_indices()
         except Exception:
             return [0]
+
+    @Slot(result=list)
+    def refreshCameras(self) -> list:
+        try:
+            inds = self.camera.available_indices(force_probe=True)
+        except Exception:
+            inds = [0]
+        try:
+            self.configChanged.emit()
+        except Exception:
+            pass
+        return inds
 
     @Slot(int, result=bool)
     def setSelectedCameraIndex(self, idx: int) -> bool:
@@ -1604,7 +1629,10 @@ class Backend(QObject):
             else:
                 self.stateChanged.emit(self.sm.state.value)
         else:
-            # Periodically re-resolve block in case time moved to new period
+            self._tick_count += 1
+            if self._tick_count < 5:
+                return
+            self._tick_count = 0
             old_block = self._block_id
             old_profile = self._profile
             self._resolve_block()
@@ -1615,7 +1643,12 @@ class Backend(QObject):
                 self.rosterChanged.emit()
 
     def _on_tts(self, text: str) -> None:
-        self.tts.speak(text)
+        tts = self._get_tts()
+        if tts is not None:
+            try:
+                tts.speak(text)
+            except Exception:
+                pass
 
     @Slot()
     def refreshHistory(self) -> None:
@@ -1634,14 +1667,10 @@ class Backend(QObject):
                 files.extend(sorted(pdir.glob(ext), key=lambda x: x.stat().st_mtime, reverse=True))
             # Build recent 100
             out=[]
-            # Build log lookup for photo path -> student/block
-            log_map={}
+            # Build log lookup for photo path -> student/block (bounded to on-screen paths)
+            log_map: dict = {}
             try:
-                for rec in self.storage.get_logs():
-                    if rec.photo_out_path:
-                        log_map[rec.photo_out_path] = rec
-                    if rec.photo_in_path:
-                        log_map[rec.photo_in_path] = rec
+                log_map = self.storage.get_logs_for_photos([str(f) for f in files[:100]])
             except Exception:
                 pass
             for f in files[:100]:

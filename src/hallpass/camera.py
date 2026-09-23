@@ -18,6 +18,7 @@ class SilentCamera:
         self._cv_cap = None
         self._camera_index = camera_index  # 0 front (student-facing), 1 rear
         self._available_indices: list[int] | None = None
+        self._last_open_fail: float = 0.0
         if warm:
             self.warm()
 
@@ -143,6 +144,7 @@ class SilentCamera:
     def _quick_opencv_capture(self, target: Path) -> bool:
         """Single fast read from the kept-open stream — no 0.5s sleeps, no multi-index loops."""
         try:
+            import time as _time
             import cv2  # type: ignore
             cap = self._cv_cap
             # Use kept-open stream first (instant)
@@ -152,6 +154,8 @@ class SilentCamera:
                     cv2.imwrite(str(target), frame)
                     if target.exists() and target.stat().st_size > 1000:
                         return True
+            if cap is None and _time.monotonic() - self._last_open_fail < 5.0:
+                return False
             # Fallback: one fresh open on the same index (V4L2 front) — still <200ms
             fresh = None
             if sys.platform.startswith("linux"):
@@ -187,6 +191,8 @@ class SilentCamera:
                         return True
             elif fresh:
                 fresh.release()
+            import time as _time2
+            self._last_open_fail = _time2.monotonic()
         except Exception:
             pass
         return False

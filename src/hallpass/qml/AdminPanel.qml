@@ -1274,8 +1274,9 @@ Dialog {
                                             anchors.margins: 2
                                             source: modelData.url
                                             fillMode: Image.PreserveAspectCrop
-                                            cache: false
+                                            cache: true
                                             asynchronous: true
+                                            sourceSize.width: 320
                                         }
                                         // Fallback label if image fails
                                         Label { anchors.centerIn: parent; visible: false; text: "No preview"; color: "#64748b"; font.pixelSize: 10 }

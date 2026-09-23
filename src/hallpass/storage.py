@@ -129,10 +129,14 @@ class Storage:
             )
             conn.commit()
 
-    def get_logs(self) -> list[PassRecord]:
+    def get_logs(self, limit: int | None = None) -> list[PassRecord]:
         with sqlite3.connect(self._db_path) as conn:
             _ensure_db(conn)
-            rows = conn.execute("SELECT student_name, block_id, pass_type, time_out, time_in, duration_minutes, overtime_status, photo_out_path, photo_in_path FROM pass_logs ORDER BY id").fetchall()
+            if limit is not None:
+                rows = conn.execute("SELECT student_name, block_id, pass_type, time_out, time_in, duration_minutes, overtime_status, photo_out_path, photo_in_path FROM pass_logs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+                rows = rows[::-1]
+            else:
+                rows = conn.execute("SELECT student_name, block_id, pass_type, time_out, time_in, duration_minutes, overtime_status, photo_out_path, photo_in_path FROM pass_logs ORDER BY id").fetchall()
         result: list[PassRecord] = []
         for r in rows:
             result.append(
@@ -149,6 +153,44 @@ class Storage:
                 )
             )
         return result
+
+    def get_recent_logs(self, count: int = 20) -> list[PassRecord]:
+        return self.get_logs(limit=count)
+
+    def get_logs_for_photos(self, paths: list[str]) -> dict[str, PassRecord]:
+        if not paths:
+            return {}
+        out: dict[str, PassRecord] = {}
+        with sqlite3.connect(self._db_path) as conn:
+            _ensure_db(conn)
+            chunk = 200
+            for i in range(0, len(paths), chunk):
+                part = paths[i:i + chunk]
+                marks = ",".join("?" for _ in part)
+                rows = conn.execute(
+                    f"SELECT student_name, block_id, pass_type, time_out, time_in, duration_minutes, overtime_status, photo_out_path, photo_in_path FROM pass_logs WHERE photo_out_path IN ({marks}) OR photo_in_path IN ({marks}) ORDER BY id",
+                    (*part, *part),
+                ).fetchall()
+                for r in rows:
+                    try:
+                        rec = PassRecord(
+                            student_name=r[0],
+                            block_id=r[1],
+                            pass_type=PassType(r[2]),
+                            time_out=datetime.strptime(r[3], "%Y-%m-%d %H:%M:%S"),
+                            time_in=datetime.strptime(r[4], "%Y-%m-%d %H:%M:%S"),
+                            duration_minutes=float(r[5]),
+                            overtime_status=OvertimeStatus(r[6]),
+                            photo_out_path=r[7],
+                            photo_in_path=r[8],
+                        )
+                    except Exception:
+                        continue
+                    if rec.photo_out_path:
+                        out[rec.photo_out_path] = rec
+                    if rec.photo_in_path:
+                        out[rec.photo_in_path] = rec
+        return out
 
     def get_logs_by_block(self, block_id: str) -> list[PassRecord]:
         return [r for r in self.get_logs() if r.block_id == block_id]
