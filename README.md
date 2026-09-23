@@ -25,10 +25,26 @@ python -m hallpass
 - Logs: `/var/lib/hallpass/pass_history.csv` + `logs.db` + `photos/`
   - Dev fallback: `./data/` when /var/lib not writable
 
+## Install on Debian (Surface Pro, one command)
+On the device, run (replace `0.3.0` with the release you want):
+```bash
+curl -fsSL https://raw.githubusercontent.com/sb-lhs/bathroom-pass-app/v0.3.0/scripts/install_debian.sh | sudo bash -s -- 0.3.0
+```
+This installs system dependencies, builds `hallpass-qt_0.3.0_amd64.deb` from the
+tagged source on-device, and installs it with `apt` (dependencies resolve from
+Debian repos). Safe to re-run for upgrades — your admin password, thresholds,
+and rosters in `/etc/hallpass/` are never overwritten. Launch with `hallpass-qt`.
+
+Already downloaded the `.deb` from the release page? Then:
+```bash
+curl -fSL https://github.com/sb-lhs/bathroom-pass-app/releases/download/v0.3.0/hallpass-qt_0.3.0_amd64.deb -o /tmp/hallpass.deb \
+  && sudo apt install -y /tmp/hallpass.deb
+```
+
 ## Packaging
 ```bash
 ./scripts/build_deb.sh
-# produces hallpass-qt_1.4.0_amd64.deb
+# produces hallpass-qt_0.3.0_amd64.deb
 ```
 
 ## Stack

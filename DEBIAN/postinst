@@ -19,7 +19,7 @@ if [ ! -f /etc/hallpass/config.json ]; then
   "salt": "",
   "bathroom_threshold_seconds": 420,
   "water_threshold_seconds": 180,
-  "selected_alarm_sound": "mixkit-facility-alarm-sound-999.wav",
+  "selected_alarm_sound": "old_bell_style_ring.wav",
   "tts_enabled": true,
   "active_schedule_profile_override": null
 }
