@@ -486,6 +486,14 @@ class Backend(QObject):
         except Exception:
             return []
 
+    @Property(list, notify=rosterChanged)  # type: ignore
+    def scheduleBlockNames(self) -> list:
+        try:
+            from .schedules import get_schedule_block_names
+            return get_schedule_block_names()
+        except Exception:
+            return []
+
     # A/B roster text (comma-separated) for QML binding — legacy compat
     def _roster_text(self, profile: str, block: str) -> str:
         try:
@@ -677,17 +685,18 @@ class Backend(QObject):
             self.rosterImportStatusChanged.emit(self._roster_import_status)
             return False
 
-    @Slot(str, str, result=bool)
-    def importRosterForBlock(self, file_url: str, block_name: str) -> bool:
+    @Slot(str, str, str, result=bool)
+    def importRosterForBlock(self, file_url: str, block_name: str, variant: str = "Everyday") -> bool:
         try:
             path = file_url
             if path.startswith("file://"):
                 path = QUrl(path).toLocalFile()
             p = Path(path)
-            merge_roster_csv(p, target_block=block_name)
+            v = variant if variant in VARIANTS else "Everyday"
+            merge_roster_csv(p, target_block=block_name, target_variant=v)
             self._update_roster_cache()
-            self._roster_import_status = f"Imported {p.name} into {block_name}"
             self.rosterChanged.emit()
+            self._roster_import_status = f"Imported {p.name} into {block_name} [{v}]"
             self.rosterImportStatusChanged.emit(self._roster_import_status)
             return True
         except Exception as e:
@@ -756,13 +765,43 @@ class Backend(QObject):
             return False
 
     @Slot(str, str, result=bool)
-    def renameRoster(self, oldName: str, newName: str) -> bool:
+    def linkRosterToBlock(self, oldName: str, newName: str) -> bool:
         try:
-            if not newName.strip() or oldName.strip() == newName.strip():
+            new = newName.strip()
+            if not new or new == oldName.strip():
                 return False
-            rename_block_roster(oldName.strip(), newName.strip())
+            s = load_rosters_structured()
+            if new in s:
+                self._roster_import_status = f"{new} already has a roster"
+                self.rosterImportStatusChanged.emit(self._roster_import_status)
+                return False
+            rename_block_roster(oldName.strip(), new)
             self._update_roster_cache()
             self.rosterChanged.emit()
+            self._roster_import_status = f"Linked roster to {new}"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return True
+        except Exception as e:
+            self._roster_import_status = f"Link failed: {e}"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return False
+
+    @Slot(str, str, result=bool)
+    def renameRoster(self, oldName: str, newName: str) -> bool:
+        try:
+            new = newName.strip()
+            if not new or new == oldName.strip():
+                return False
+            s = load_rosters_structured()
+            if new in s:
+                self._roster_import_status = f"{new} already has a roster — pick another name"
+                self.rosterImportStatusChanged.emit(self._roster_import_status)
+                return False
+            rename_block_roster(oldName.strip(), new)
+            self._update_roster_cache()
+            self.rosterChanged.emit()
+            self._roster_import_status = f"Roster renamed to {new}"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
             return True
         except Exception:
             return False
@@ -1002,6 +1041,7 @@ class Backend(QObject):
                 del t[name.strip()]
                 set_templates(t)
                 self.scheduleChanged.emit()
+                self.rosterChanged.emit()
                 return True
             return False
         except Exception:
@@ -1020,6 +1060,7 @@ class Backend(QObject):
             t[n] = [dict(b) for b in src]
             set_templates(t)
             self.scheduleChanged.emit()
+            self.rosterChanged.emit()
             return True
         except Exception:
             return False

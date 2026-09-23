@@ -14,6 +14,7 @@ Dialog {
     property string mode: "admin"
     property string currentTab: "Schedules"
     property string pendingRosterBlock: ""
+    property string pendingRosterVariant: "Everyday"
     property string pendingTab: ""
     property bool pendingClose: false
     property var rosterDirty: ({})
@@ -29,6 +30,28 @@ Dialog {
     }
     function tryCloseAdmin() {
         if (hasUnsavedRosters()) { pendingClose = true; unsavedDialog.open() } else { admin.close() }
+    }
+    function unlockWithPin() {
+        if (backend.verifyAdmin(pinField.text)) {
+            pinError.text = ""
+            pinField.text = ""
+        } else {
+            pinError.text = "Incorrect password"
+        }
+    }
+    function submitNewPassword() {
+        var wasFirst = backend.isFirstRun
+        backend.setInitialPassword(newPassField.text, confirmPassField.text)
+        if (backend.isAdminAuthenticated) {
+            newPassField.text = ""; confirmPassField.text = ""
+            if (wasFirst) showSchoolStep = true
+        }
+    }
+    function submitCustomDay() {
+        if (customDateField.text.length === 10) {
+            backend.setCustomDayTemplate(customDateField.text, customTemplateBox.currentText)
+            backend.setCustomDayLetter(customDateField.text, customLetterBox.currentText)
+        }
     }
 
     background: Rectangle {
@@ -78,6 +101,7 @@ Dialog {
                 color: "#1e293b"
                 placeholderTextColor: "#64748b"
                 background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
+                onAccepted: admin.submitNewPassword()
             }
             TextField {
                 id: confirmPassField
@@ -89,6 +113,7 @@ Dialog {
                 color: "#1e293b"
                 placeholderTextColor: "#64748b"
                 background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
+                onAccepted: admin.submitNewPassword()
             }
             Label { id: firstRunError; text: backend.passwordStatus; color: backend.passwordStatus === "Password set" ? "#14532d" : "#ef4444"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true; visible: backend.passwordStatus !== "" }
             Button {
@@ -97,14 +122,7 @@ Dialog {
                 Layout.preferredHeight: 48
                 contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 14 }
                 background: Rectangle { color: "#1e3a5f"; radius: 4 }
-                                onClicked: {
-                                    var wasFirst = backend.isFirstRun
-                                    backend.setInitialPassword(newPassField.text, confirmPassField.text)
-                                    if (backend.isAdminAuthenticated) {
-                                        newPassField.text = ""; confirmPassField.text = ""
-                                        if (wasFirst) showSchoolStep = true
-                                    }
-                                }
+                                onClicked: admin.submitNewPassword()
             }
             Button {
                 text: "Cancel"
@@ -137,6 +155,7 @@ Dialog {
                 color: "#1e293b"
                 placeholderTextColor: "#64748b"
                 background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
+                onAccepted: admin.unlockWithPin()
             }
             Label { id: pinError; text: ""; color: "#ef4444"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             Button {
@@ -145,14 +164,7 @@ Dialog {
                 Layout.preferredHeight: 48
                 contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 15 }
                 background: Rectangle { color: "#14532d"; radius: 4 }
-                onClicked: {
-                    if (backend.verifyAdmin(pinField.text)) {
-                        pinError.text = ""
-                        pinField.text = ""
-                    } else {
-                        pinError.text = "Incorrect password"
-                    }
-                }
+                onClicked: admin.unlockWithPin()
             }
             Button {
                 text: "Cancel"
@@ -424,7 +436,7 @@ Dialog {
                             RowLayout {
                                 spacing: 8
                                 Layout.fillWidth: true
-                                TextField { id: customDateField; placeholderText: "YYYY-MM-DD"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 130; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; radius: 4 } }
+                                TextField { id: customDateField; placeholderText: "YYYY-MM-DD"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 130; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; radius: 4 } onAccepted: admin.submitCustomDay() }
                                 ComboBox { id: customTemplateBox; model: Object.keys(backend.templates).length ? Object.keys(backend.templates) : ["Regular"]; Layout.preferredWidth: 150; Layout.preferredHeight: 36; background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 } contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 12 } delegate: ItemDelegate { width: parent.width; contentItem: Text { text: modelData; color: "#0f172a"; font.pixelSize: 12 } background: Rectangle { color: highlighted ? "#e2e8f0" : "#ffffff" } } }
                                 ComboBox { id: customLetterBox; model: ["Everyday", "A", "B"]; Layout.preferredWidth: 90; Layout.preferredHeight: 36; background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 } contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 12 } delegate: ItemDelegate { width: parent.width; contentItem: Text { text: modelData; color: "#0f172a"; font.pixelSize: 12 } background: Rectangle { color: highlighted ? "#e2e8f0" : "#ffffff" } } }
                                 Button {
@@ -433,12 +445,7 @@ Dialog {
                                     Layout.preferredHeight: 36
                                     background: Rectangle { color: "#1e3a5f"; radius: 4 }
                                     contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
-                                    onClicked: {
-                                        if (customDateField.text.length === 10) {
-                                            backend.setCustomDayTemplate(customDateField.text, customTemplateBox.currentText)
-                                            backend.setCustomDayLetter(customDateField.text, customLetterBox.currentText)
-                                        }
-                                    }
+                                    onClicked: admin.submitCustomDay()
                                 }
                                 Button {
                                     text: "Clear"
@@ -569,10 +576,10 @@ Dialog {
                                 columnSpacing: 8
                                 rowSpacing: 8
                                 Layout.fillWidth: true
-                                TextField { id: expSchool; placeholderText: "School name"; color: "#0f172a"; placeholderTextColor: "#64748b"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
-                                TextField { id: expLocation; placeholderText: "City, ST"; color: "#0f172a"; placeholderTextColor: "#64748b"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
-                                TextField { id: expContributor; placeholderText: "Your name"; color: "#0f172a"; placeholderTextColor: "#64748b"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
-                                TextField { id: expSlug; placeholderText: "file-name"; color: "#0f172a"; placeholderTextColor: "#64748b"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
+                                TextField { id: expSchool; placeholderText: "School name"; color: "#0f172a"; placeholderTextColor: "#64748b"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } onAccepted: presetSaveDialog.open() }
+                                TextField { id: expLocation; placeholderText: "City, ST"; color: "#0f172a"; placeholderTextColor: "#64748b"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } onAccepted: presetSaveDialog.open() }
+                                TextField { id: expContributor; placeholderText: "Your name"; color: "#0f172a"; placeholderTextColor: "#64748b"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } onAccepted: presetSaveDialog.open() }
+                                TextField { id: expSlug; placeholderText: "file-name"; color: "#0f172a"; placeholderTextColor: "#64748b"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } onAccepted: presetSaveDialog.open() }
                             }
                             Button {
                                 text: "Export to File"
@@ -701,7 +708,7 @@ Dialog {
                             RowLayout {
                                 spacing: 8
                                 Layout.fillWidth: true
-                                TextField { id: newTemplateName; placeholderText: "New schedule name (e.g., Late Start)"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
+                                TextField { id: newTemplateName; placeholderText: "New schedule name (e.g., Late Start)"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } onAccepted: if (backend.createTemplate(newTemplateName.text, copyFromTemplate.currentText)) newTemplateName.text = "" }
                                 ComboBox { id: copyFromTemplate; model: Object.keys(backend.templates).length ? Object.keys(backend.templates) : ["Regular"]; Layout.preferredWidth: 150; Layout.preferredHeight: 36; background: Rectangle { color: "#ffffff"; border.color: "#64748b"; radius: 4 } contentItem: Text { text: "Copy from " + parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 11 } }
                                 Button {
                                     text: "Create"
@@ -773,10 +780,10 @@ Dialog {
                                             RowLayout {
                                                 spacing: 6
                                                 Layout.fillWidth: true
-                                                TextField { id: addTName; placeholderText: "empty=Block N or Lunch"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 140; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
-                                                TextField { id: addTStart; placeholderText: "8:00 AM"; text: "8:00 AM"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 96; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
+                                                TextField { id: addTName; placeholderText: "empty=Block N or Lunch"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 140; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } onAccepted: if (backend.addBlockToTemplate(tmplName, addTName.text, addTStart.text, addTEnd.text)) addTName.text="" }
+                                                TextField { id: addTStart; placeholderText: "8:00 AM"; text: "8:00 AM"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 96; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } onAccepted: if (backend.addBlockToTemplate(tmplName, addTName.text, addTStart.text, addTEnd.text)) addTName.text="" }
                                                 Label { text: "→"; color: "#0f172a"; font.pixelSize: 12; font.bold: true }
-                                                TextField { id: addTEnd; placeholderText: "9:20 AM"; text: "9:20 AM"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 96; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
+                                                TextField { id: addTEnd; placeholderText: "9:20 AM"; text: "9:20 AM"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.preferredWidth: 96; Layout.preferredHeight: 34; font.pixelSize: 11; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } onAccepted: if (backend.addBlockToTemplate(tmplName, addTName.text, addTStart.text, addTEnd.text)) addTName.text="" }
                                                 Button {
                                                     text: "Add to " + tmplName
                                                     Layout.fillWidth: true
@@ -1009,7 +1016,7 @@ Dialog {
                             RowLayout {
                                 spacing: 8
                                 Layout.fillWidth: true
-                                TextField { id: newRosterName; placeholderText: "Roster name (e.g., Chem Lab)"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#14532d"; border.width: 1; radius: 4 } }
+                                TextField { id: newRosterName; placeholderText: "Roster name (e.g., Chem Lab)"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#14532d"; border.width: 1; radius: 4 } onAccepted: if (backend.createRoster(newRosterName.text)) newRosterName.text = "" }
                                 ComboBox {
                                     id: blockPickBox
                                     model: backend.blocksWithoutRosters
@@ -1041,8 +1048,16 @@ Dialog {
                             model: backend.rosterNames
                             delegate: Rectangle {
                                 property string blockName: modelData
+                                function saveRoster() {
+                                    if (backend.setRosterForBlockVariant(blockName, variantBox.currentText, rosterField.text)) {
+                                        rosterField.originalText = rosterField.text
+                                        var m = admin.rosterDirty
+                                        m[blockName + ":" + variantBox.currentText] = false
+                                        admin.rosterDirty = m
+                                    }
+                                }
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 190
+                                Layout.preferredHeight: 198
                                 radius: 6
                                 color: "#ffffff"
                                 border.color: "#d1d5db"
@@ -1061,12 +1076,15 @@ Dialog {
                                         background: Rectangle { color: "transparent"; border.color: rosterNameField.activeFocus ? "#1e3a5f" : "transparent"; radius: 4 }
                                         onEditingFinished: {
                                             if (text.trim() !== "" && text.trim() !== blockName) {
-                                                var m = admin.rosterDirty
-                                                m[blockName + ":Everyday"] = false
-                                                m[blockName + ":A"] = false
-                                                m[blockName + ":B"] = false
-                                                admin.rosterDirty = m
-                                                backend.renameRoster(blockName, text.trim())
+                                                if (backend.renameRoster(blockName, text.trim())) {
+                                                    var m = admin.rosterDirty
+                                                    m[blockName + ":Everyday"] = false
+                                                    m[blockName + ":A"] = false
+                                                    m[blockName + ":B"] = false
+                                                    admin.rosterDirty = m
+                                                } else {
+                                                    text = blockName
+                                                }
                                             } else {
                                                 text = blockName
                                             }
@@ -1074,14 +1092,19 @@ Dialog {
                                     RowLayout {
                                         spacing: 10
                                         Layout.fillWidth: true
-                                        Rectangle {
-                                            color: "#334155"
-                                            radius: 6
-                                            border.color: "#334155"
-                                            border.width: 1
-                                            Layout.preferredWidth: 110
-                                            Layout.preferredHeight: 22
-                                            Label { anchors.centerIn: parent; text: blockName.indexOf("Block")===0 ? "Auto Block" : "Custom Block"; color: "white"; font.pixelSize: 10; font.bold: true; elide: Text.ElideRight }
+                                        ComboBox {
+                                            id: blockLinkBox
+                                            model: backend.scheduleBlockNames
+                                            currentIndex: backend.scheduleBlockNames.indexOf(blockName)
+                                            Layout.preferredWidth: 180
+                                            Layout.preferredHeight: 30
+                                            background: Rectangle { color: "#eef2ff"; border.color: "#1e3a5f"; border.width: 1; radius: 4 }
+                                            contentItem: Text { text: blockLinkBox.currentIndex >= 0 ? blockLinkBox.displayText : "Link to block…"; color: "#1e3a5f"; verticalAlignment: Text.AlignVCenter; leftPadding: 8; font.pixelSize: 11; font.bold: true; elide: Text.ElideRight }
+                                            delegate: ItemDelegate { width: parent.width; contentItem: Text { text: modelData; color: "#0f172a"; font.pixelSize: 11 } background: Rectangle { color: highlighted ? "#e2e8f0" : "#ffffff" } }
+                                            onActivated: {
+                                                if (currentText !== blockName && !backend.linkRosterToBlock(blockName, currentText))
+                                                    currentIndex = backend.scheduleBlockNames.indexOf(blockName)
+                                            }
                                         }
                                         Item { Layout.fillWidth: true }
                                         Rectangle {
@@ -1089,9 +1112,9 @@ Dialog {
                                             radius: 4
                                             border.color: "#d1d5db"
                                             border.width: 1
-                                            Layout.preferredWidth: 110
+                                            Layout.preferredWidth: 150
                                             Layout.preferredHeight: 22
-                                            Label { anchors.centerIn: parent; text: (backend.structuredRosters[blockName] ? ((backend.structuredRosters[blockName]["Everyday"]||[]).length + (backend.structuredRosters[blockName]["A"]||[]).length + (backend.structuredRosters[blockName]["B"]||[]).length) : (backend.flatRosters[blockName] ? backend.flatRosters[blockName].length : 0)) + " total"; color: "#1e293b"; font.pixelSize: 11; font.bold: true; elide: Text.ElideRight }
+                                            Label { anchors.centerIn: parent; text: backend.structuredRosters[blockName] ? ("E:" + (backend.structuredRosters[blockName]["Everyday"]||[]).length + " A:" + (backend.structuredRosters[blockName]["A"]||[]).length + " B:" + (backend.structuredRosters[blockName]["B"]||[]).length) : "E:0 A:0 B:0"; color: "#1e293b"; font.pixelSize: 11; font.bold: true; elide: Text.ElideRight }
                                         }
                                     }
                                     RowLayout {
@@ -1146,6 +1169,7 @@ Dialog {
                                             m[blockName + ":" + variantBox.currentText] = false
                                             admin.rosterDirty = m
                                         }
+                                        onAccepted: saveRoster()
                                     }
                                     Label {
                                         visible: rosterField.text !== rosterField.originalText
@@ -1159,19 +1183,12 @@ Dialog {
                                         spacing: 8
                                         Layout.fillWidth: true
                                         Button {
-                                            text: "Save Roster"
+                                            text: "Save " + variantBox.currentText + " Roster"
                                             Layout.fillWidth: true
                                             Layout.preferredHeight: 36
                                             background: Rectangle { color: "#1e3a5f"; radius: 4 }
                                             contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 11 }
-                                            onClicked: {
-                                                if (backend.setRosterForBlockVariant(blockName, variantBox.currentText, rosterField.text)) {
-                                                    rosterField.originalText = rosterField.text
-                                                    var m = admin.rosterDirty
-                                                    m[blockName + ":" + variantBox.currentText] = false
-                                                    admin.rosterDirty = m
-                                                }
-                                            }
+                                            onClicked: saveRoster()
                                         }
                                         Button {
                                             text: "Import CSV"
@@ -1179,7 +1196,7 @@ Dialog {
                                             Layout.preferredHeight: 36
                                             background: Rectangle { color: "#334155"; radius: 4 }
                                             contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 11 }
-                                            onClicked: { admin.pendingRosterBlock = blockName; rosterFileDialog.open() }
+                                            onClicked: { admin.pendingRosterBlock = blockName; admin.pendingRosterVariant = variantBox.currentText; rosterFileDialog.open() }
                                         }
                                         Button {
                                             text: "Delete Roster"
@@ -1207,7 +1224,7 @@ Dialog {
                         title: "Select Roster CSV"
                         nameFilters: ["CSV files (*.csv)"]
                         onAccepted: {
-                            if (backend.importRosterForBlock(selectedFile, admin.pendingRosterBlock)) {
+                            if (backend.importRosterForBlock(selectedFile, admin.pendingRosterBlock, admin.pendingRosterVariant)) {
                                 var m = admin.rosterDirty
                                 m[admin.pendingRosterBlock] = false
                                 admin.rosterDirty = m

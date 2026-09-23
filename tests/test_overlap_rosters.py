@@ -110,6 +110,52 @@ def test_roster_rename():
         assert "Chem Lab" not in s
         assert s["Physics Lab"]["A"] == ["Zoe"]
 
+def test_roster_rename_refuses_taken():
+    with tempfile.TemporaryDirectory() as tmp:
+        _isolate(tmp)
+        from hallpass.rosters import create_block_roster, load_rosters_structured, rename_block_roster, set_roster_for_block_variant
+        assert create_block_roster("2A") is True
+        assert create_block_roster("2B") is True
+        set_roster_for_block_variant("2A", "A", ["Amy"])
+        set_roster_for_block_variant("2B", "B", ["Zoe"])
+        assert rename_block_roster("2A", "Block 2") is True
+        assert rename_block_roster("2B", "Block 2") is False
+        s = load_rosters_structured()
+        assert s["Block 2"]["A"] == ["Amy"]
+        assert s["2B"]["B"] == ["Zoe"]
+
+def test_csv_import_targets_variant():
+    with tempfile.TemporaryDirectory() as tmp:
+        _isolate(tmp)
+        from hallpass.rosters import create_block_roster, load_rosters_structured, merge_roster_csv
+        assert create_block_roster("Block 2") is True
+        csv_path = Path(tmp) / "bday.csv"
+        csv_path.write_text("Student Name\nZoe Hart\nAmy Lane\n", encoding="utf-8")
+        merge_roster_csv(csv_path, target_block="Block 2", target_variant="B")
+        s = load_rosters_structured()
+        assert s["Block 2"]["B"] == ["Zoe Hart", "Amy Lane"]
+        assert s["Block 2"]["Everyday"] == []
+        assert s["Block 2"]["A"] == []
+
+def test_backend_import_routes_variant():
+    import os as _os
+    _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    with tempfile.TemporaryDirectory() as tmp:
+        _isolate(tmp)
+        from PySide6.QtWidgets import QApplication
+        _app = QApplication.instance() or QApplication([])
+        from hallpass.backend import Backend
+        b = Backend()
+        assert b.createRoster("Block 2") is True
+        csv_path = Path(tmp) / "aday.csv"
+        csv_path.write_text("Amy Lane\n", encoding="utf-8")
+        assert b.importRosterForBlock(csv_path.as_uri(), "Block 2", "A") is True
+        assert "Block 2 [A]" in b.rosterImportStatus
+        from hallpass.rosters import load_rosters_structured
+        s = load_rosters_structured()
+        assert s["Block 2"]["A"] == ["Amy Lane"]
+        assert s["Block 2"]["Everyday"] == []
+
 def test_roster_create_delete():
     with tempfile.TemporaryDirectory() as tmp:
         _isolate(tmp)

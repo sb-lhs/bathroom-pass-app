@@ -245,6 +245,20 @@ def get_all_display_names() -> list[str]:
     return sorted(seen, key=sort_key)
 
 
+def get_schedule_block_names() -> list[str]:
+    data = load_schedules()
+    templates = data.get("templates", {}) if isinstance(data.get("templates"), dict) else {}
+    seen: set[str] = set()
+    for tname in templates.keys():
+        for b in get_display_blocks(str(tname)):
+            seen.add(b["display_name"])
+    def sort_key(n: str):
+        if n.startswith("Block ") and n[6:].isdigit():
+            return (0, int(n[6:]), n)
+        return (1, 999, n.lower())
+    return sorted(seen, key=sort_key)
+
+
 def _normalize_weekday_letters(raw: Any) -> dict[str, str]:
     if not isinstance(raw, dict):
         raw = {}

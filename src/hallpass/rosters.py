@@ -348,22 +348,17 @@ def create_block_roster(name: str) -> bool:
     return True
 
 
-def rename_block_roster(old_name: str, new_name: str) -> None:
+def rename_block_roster(old_name: str, new_name: str) -> bool:
     if old_name == new_name:
-        return
+        return True
     s = load_rosters_structured()
-    if old_name in s:
-        if new_name in s:
-            # merge variants union
-            for v in VARIANTS:
-                seen = set(s[new_name].get(v, []))
-                for n in s[old_name].get(v, []):
-                    if n not in seen:
-                        s[new_name][v].append(n)
-            del s[old_name]
-        else:
-            s[new_name] = s.pop(old_name)
-        save_rosters(s)
+    if old_name not in s:
+        return False
+    if new_name in s:
+        return False
+    s[new_name] = s.pop(old_name)
+    save_rosters(s)
+    return True
 
 
 def delete_block_roster(block_name: str) -> None:
