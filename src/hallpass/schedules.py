@@ -19,7 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .config import schedules_path
+from .config import _config_dir, schedules_path
 
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -917,3 +917,351 @@ def import_date_overrides_ics(ics_path: Path, clear_existing: bool = True) -> di
             summary = ""
     set_date_overrides(new_map)
     return new_map
+
+
+SYSTEM_SCHOOLS_DIR = Path("/usr/share/hallpass/schools")
+REPO_SCHOOLS_DIR = Path.cwd() / "schools"
+REMOTE_PRESET_BASE = "https://raw.githubusercontent.com/sb-lhs/bathroom-pass-app/main/"
+REMOTE_PRESET_INDEX = "schools/index.json"
+
+
+def _user_schools_dir() -> Path:
+    return _config_dir() / "schools"
+
+
+def _sanitize_slug(raw: Any) -> str:
+    import re as _re
+    s = str(raw or "").strip().lower()
+    s = _re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+    return s
+
+
+def schools_dirs() -> list[Path]:
+    return [_user_schools_dir(), SYSTEM_SCHOOLS_DIR, REPO_SCHOOLS_DIR]
+
+
+def validate_school_preset(data: Any) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(data, dict):
+        return ["preset must be a JSON object"]
+    school = str(data.get("school") or "").strip()
+    if not school:
+        errors.append("missing 'school' name")
+    slug = str(data.get("slug") or "").strip()
+    if not slug:
+        errors.append("missing 'slug'")
+    elif _sanitize_slug(slug) != slug.lower().strip():
+        errors.append("slug must be lowercase letters, numbers and hyphens")
+    templates = data.get("templates")
+    if not isinstance(templates, dict) or not templates:
+        errors.append("missing or empty 'templates'")
+        return errors
+    normed = _normalize_templates(templates)
+    if set(normed.keys()) != set([_norm_template_name(k) for k in templates.keys() if isinstance(templates[k], list) and templates[k]]):
+        errors.append("one or more templates have no valid blocks")
+    for tname, blocks in templates.items():
+        if not isinstance(blocks, list) or not blocks:
+            errors.append(f"template '{tname}' has no blocks")
+            continue
+        for i, b in enumerate(blocks):
+            if not isinstance(b, dict):
+                errors.append(f"template '{tname}' block {i} is not an object")
+                continue
+            start = _norm_time(str(b.get("start", "")), "")
+            end = _norm_time(str(b.get("end", "")), "")
+            if not start:
+                errors.append(f"template '{tname}' block {i} has invalid start time")
+            if not end:
+                errors.append(f"template '{tname}' block {i} has invalid end time")
+            if start and end and not end > start:
+                errors.append(f"template '{tname}' block {i} end must be after start")
+    wt = data.get("weekday_templates", {})
+    if wt and not isinstance(wt, dict):
+        errors.append("'weekday_templates' must be an object")
+    elif isinstance(wt, dict):
+        for wd, tn in wt.items():
+            if wd not in WEEKDAYS:
+                errors.append(f"unknown weekday '{wd}'")
+            elif _norm_template_name(tn) not in normed:
+                errors.append(f"weekday '{wd}' points at unknown template '{tn}'")
+    wl = data.get("weekday_letters", {})
+    if wl and not isinstance(wl, dict):
+        errors.append("'weekday_letters' must be an object")
+    elif isinstance(wl, dict):
+        for wd, letter in wl.items():
+            if wd not in WEEKDAYS:
+                errors.append(f"unknown weekday '{wd}' in letters")
+            elif str(letter).strip() not in DAY_TYPES:
+                errors.append(f"weekday '{wd}' has invalid letter '{letter}'")
+    ver = data.get("version", 1)
+    if not isinstance(ver, int) or ver < 1:
+        errors.append("'version' must be a positive integer")
+    return errors
+
+
+def _read_preset_file(path: Path) -> dict[str, Any] | None:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(raw, dict):
+        return None
+    if validate_school_preset(raw):
+        return None
+    return raw
+
+
+def list_school_presets() -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for d in schools_dirs():
+        try:
+            if not d.is_dir():
+                continue
+            files = sorted(d.glob("*.json"))
+        except Exception:
+            continue
+        for f in files:
+            if f.name == "index.json":
+                continue
+            raw = _read_preset_file(f)
+            if raw is None:
+                continue
+            slug = str(raw.get("slug"))
+            if slug in seen:
+                continue
+            seen.add(slug)
+            templates = _normalize_templates(raw.get("templates"))
+            out.append({
+                "slug": slug,
+                "school": str(raw.get("school") or ""),
+                "location": str(raw.get("location") or ""),
+                "contributor": str(raw.get("contributor") or ""),
+                "template_count": len(templates),
+                "template_names": sorted(templates.keys()),
+            })
+    return sorted(out, key=lambda x: x["school"].lower())
+
+
+def load_school_preset(slug: str) -> dict[str, Any] | None:
+    want = _sanitize_slug(slug)
+    if not want:
+        return None
+    for d in schools_dirs():
+        try:
+            if not d.is_dir():
+                continue
+            for f in sorted(d.glob("*.json")):
+                raw = _read_preset_file(f)
+                if raw is not None and str(raw.get("slug")) == want:
+                    templates = _normalize_templates(raw.get("templates"))
+                    wt_raw = raw.get("weekday_templates", {})
+                    wl_raw = raw.get("weekday_letters", {})
+                    wt = {wd: _norm_template_name(wt_raw.get(wd, "Regular")) for wd in WEEKDAYS} if isinstance(wt_raw, dict) else default_weekday_templates()
+                    wl = {wd: _norm_day_type(wl_raw.get(wd, "Everyday")) for wd in WEEKDAYS} if isinstance(wl_raw, dict) else {wd: "Everyday" for wd in WEEKDAYS}
+                    return {
+                        "slug": want,
+                        "school": str(raw.get("school") or ""),
+                        "location": str(raw.get("location") or ""),
+                        "contributor": str(raw.get("contributor") or ""),
+                        "notes": str(raw.get("notes") or ""),
+                        "version": raw.get("version", 1),
+                        "templates": templates,
+                        "weekday_templates": wt,
+                        "weekday_letters": wl,
+                    }
+        except Exception:
+            continue
+    return None
+
+
+def apply_school_preset(slug: str) -> dict[str, Any]:
+    preset = load_school_preset(slug)
+    if preset is None:
+        return {"added": [], "skipped": [], "error": "preset not found"}
+    data = load_schedules()
+    existing = data.get("templates", {})
+    if not isinstance(existing, dict):
+        existing = {}
+    added: list[str] = []
+    skipped: list[str] = []
+    label = preset["school"] or preset["slug"]
+    try:
+        factory = default_schedules().get("templates", {})
+    except Exception:
+        factory = {}
+    for tname, blocks in preset["templates"].items():
+        if tname not in existing:
+            existing[tname] = [dict(b) for b in blocks]
+            added.append(tname)
+            continue
+        if existing[tname] == blocks:
+            skipped.append(tname)
+            continue
+        if isinstance(factory, dict) and factory.get(tname) == existing[tname]:
+            existing[tname] = [dict(b) for b in blocks]
+            added.append(tname)
+            continue
+        alt = f"{label} — {tname}"
+        n = 2
+        base_alt = alt
+        while alt in existing and existing[alt] != blocks:
+            alt = f"{base_alt} ({n})"
+            n += 1
+        if alt in existing:
+            skipped.append(tname)
+        else:
+            existing[alt] = [dict(b) for b in blocks]
+            added.append(alt)
+    data["templates"] = existing
+    save_schedules(data)
+    return {"added": added, "skipped": skipped}
+
+
+def apply_school_preset_weekdays(slug: str) -> bool:
+    preset = load_school_preset(slug)
+    if preset is None:
+        return False
+    data = load_schedules()
+    templates = data.get("templates", {})
+    if not isinstance(templates, dict):
+        return False
+    wt = data.get("weekday_templates", {})
+    wl = data.get("weekday_letters", {})
+    if not isinstance(wt, dict):
+        wt = {}
+    if not isinstance(wl, dict):
+        wl = {}
+    for wd in WEEKDAYS:
+        tn = preset["weekday_templates"].get(wd, "Regular")
+        if tn in templates:
+            wt[wd] = tn
+            wl[wd] = preset["weekday_letters"].get(wd, "Everyday")
+    data["weekday_templates"] = {wd: _norm_template_name(wt.get(wd, "Regular")) for wd in WEEKDAYS}
+    data["weekday_letters"] = {wd: _norm_day_type(wl.get(wd, "Everyday")) for wd in WEEKDAYS}
+    data["day_defaults"] = dict(data["weekday_letters"])
+    save_schedules(data)
+    return True
+
+
+def export_school_preset(school: str, slug: str, location: str = "", contributor: str = "", notes: str = "") -> dict[str, Any]:
+    clean_slug = _sanitize_slug(slug) or _sanitize_slug(school)
+    data = load_schedules()
+    templates = data.get("templates", {})
+    wt = data.get("weekday_templates", {})
+    wl = data.get("weekday_letters", {})
+    preset = {
+        "school": str(school or "").strip(),
+        "slug": clean_slug,
+        "location": str(location or "").strip(),
+        "contributor": str(contributor or "").strip(),
+        "version": 1,
+        "templates": {tn: [{"start": b.get("start", ""), "end": b.get("end", ""), "name": b.get("name", "")} for b in blocks] for tn, blocks in templates.items()} if isinstance(templates, dict) else {},
+        "weekday_templates": {wd: wt.get(wd, "Regular") for wd in WEEKDAYS} if isinstance(wt, dict) else default_weekday_templates(),
+        "weekday_letters": {wd: wl.get(wd, "Everyday") for wd in WEEKDAYS} if isinstance(wl, dict) else {wd: "Everyday" for wd in WEEKDAYS},
+    }
+    if str(notes or "").strip():
+        preset["notes"] = str(notes).strip()
+    errors = validate_school_preset(preset)
+    if errors:
+        return {"ok": False, "errors": errors}
+    return {"ok": True, "preset": preset}
+
+
+def import_school_preset_file(src: Path) -> dict[str, Any]:
+    try:
+        raw = json.loads(Path(src).read_text(encoding="utf-8"))
+    except Exception as e:
+        return {"ok": False, "errors": [f"could not read file: {e}"]}
+    errors = validate_school_preset(raw)
+    if errors:
+        return {"ok": False, "errors": errors}
+    slug = _sanitize_slug(raw.get("slug"))
+    dest_dir = _user_schools_dir()
+    try:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / f"{slug}.json"
+        dest.write_text(json.dumps(raw, indent=2), encoding="utf-8")
+    except Exception as e:
+        return {"ok": False, "errors": [f"could not save preset: {e}"]}
+    return {"ok": True, "slug": slug}
+
+
+def _fetch_url(url: str, timeout: int = 15) -> bytes:
+    import urllib.request as _request
+    if not url.startswith(("https://", "file://")):
+        raise ValueError("refused non-https url")
+    req = _request.Request(url, headers={"User-Agent": "hallpass-qt"})
+    with _request.urlopen(req, timeout=timeout) as resp:
+        return resp.read()
+
+
+def parse_remote_preset_index(raw_bytes: bytes) -> dict[str, Any]:
+    try:
+        data = json.loads(raw_bytes.decode("utf-8"))
+    except Exception:
+        return {"ok": False, "error": "invalid index file", "entries": []}
+    if not isinstance(data, list):
+        return {"ok": False, "error": "invalid index file", "entries": []}
+    entries: list[dict[str, Any]] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        slug = _sanitize_slug(item.get("slug"))
+        school = str(item.get("school") or "").strip()
+        path = str(item.get("path") or "").strip()
+        if not slug or not school or not path:
+            continue
+        if ".." in path or path.startswith("/"):
+            continue
+        entries.append({
+            "slug": slug,
+            "school": school,
+            "location": str(item.get("location") or ""),
+            "version": item.get("version", 1),
+            "path": path,
+        })
+    return {"ok": True, "entries": sorted(entries, key=lambda e: e["school"].lower())}
+
+
+def fetch_remote_preset_index(base_url: str = REMOTE_PRESET_BASE) -> dict[str, Any]:
+    try:
+        raw = _fetch_url(base_url.rstrip("/") + "/" + REMOTE_PRESET_INDEX)
+    except Exception:
+        return {"ok": False, "error": "could not reach GitHub — check connection", "entries": []}
+    return parse_remote_preset_index(raw)
+
+
+def install_remote_preset_bytes(slug: str, raw_bytes: bytes) -> dict[str, Any]:
+    try:
+        raw = json.loads(raw_bytes.decode("utf-8"))
+    except Exception:
+        return {"ok": False, "errors": ["downloaded file is not valid JSON"]}
+    errors = validate_school_preset(raw)
+    if errors:
+        return {"ok": False, "errors": errors}
+    if _sanitize_slug(raw.get("slug")) != _sanitize_slug(slug):
+        return {"ok": False, "errors": ["downloaded preset does not match request"]}
+    dest_dir = _user_schools_dir()
+    try:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / f"{_sanitize_slug(slug)}.json"
+        dest.write_text(json.dumps(raw, indent=2), encoding="utf-8")
+    except Exception as e:
+        return {"ok": False, "errors": [f"could not save preset: {e}"]}
+    return {"ok": True, "slug": _sanitize_slug(slug)}
+
+
+def fetch_and_install_remote_preset(slug: str, base_url: str = REMOTE_PRESET_BASE) -> dict[str, Any]:
+    want = _sanitize_slug(slug)
+    index = fetch_remote_preset_index(base_url)
+    if not index.get("ok"):
+        return {"ok": False, "errors": [index.get("error", "index failed")]}
+    match = next((e for e in index["entries"] if e["slug"] == want), None)
+    if match is None:
+        return {"ok": False, "errors": ["preset not listed"]}
+    try:
+        raw = _fetch_url(base_url.rstrip("/") + "/" + match["path"])
+    except Exception:
+        return {"ok": False, "errors": ["download failed — check connection"]}
+    return install_remote_preset_bytes(want, raw)

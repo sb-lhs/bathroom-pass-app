@@ -31,3 +31,4 @@ voices/*.onnx.json
 .codegraph/
 .DS_Store
 classic_chime.wav.placeholder
+hallpass-qt_0.3.0_amd64/

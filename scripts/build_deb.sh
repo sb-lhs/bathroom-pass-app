@@ -11,6 +11,7 @@ mkdir -p "$PKG/usr/bin"
 mkdir -p "$PKG/usr/lib/hallpass"
 mkdir -p "$PKG/usr/share/applications"
 mkdir -p "$PKG/usr/share/hallpass/sounds"
+mkdir -p "$PKG/usr/share/hallpass/schools"
 mkdir -p "$PKG/etc/hallpass"
 mkdir -p "$PKG/var/lib/hallpass/photos"
 
@@ -28,6 +29,7 @@ cp "$ROOT/src/main.py" "$PKG/usr/lib/hallpass/main.py"
 cp "$ROOT/default_schedules.json" "$PKG/usr/share/hallpass/default_schedules.json"
 cp "$ROOT/config.default.json" "$PKG/usr/share/hallpass/config.default.json"
 cp "$ROOT/default_rosters.json" "$PKG/usr/share/hallpass/default_rosters.json"
+if ls "$ROOT/schools"/*.json 1>/dev/null 2>&1; then cp "$ROOT/schools"/*.json "$PKG/usr/share/hallpass/schools/"; fi
 cp "$ROOT/hallpass-qt.desktop" "$PKG/usr/share/applications/hallpass-qt.desktop"
 # Sounds
 if ls "$ROOT/sounds"/*.wav 1>/dev/null 2>&1; then cp "$ROOT/sounds"/*.wav "$PKG/usr/share/hallpass/sounds/"; else touch "$PKG/usr/share/hallpass/sounds/classic_chime.wav"; touch "$PKG/usr/share/hallpass/sounds/digital_alarm.wav"; touch "$PKG/usr/share/hallpass/sounds/subtle_bell.wav"; fi

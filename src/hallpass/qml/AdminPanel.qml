@@ -17,8 +17,9 @@ Dialog {
     property string pendingTab: ""
     property bool pendingClose: false
     property var rosterDirty: ({})
-    onClosed: backend.logoutAdmin()
-    onVisibleChanged: if (!visible) backend.logoutAdmin()
+    property bool showSchoolStep: false
+    onClosed: { showSchoolStep = false; backend.logoutAdmin() }
+    onVisibleChanged: if (!visible) { showSchoolStep = false; backend.logoutAdmin() }
     function hasUnsavedRosters() {
         for (var k in rosterDirty) if (rosterDirty[k]) return true
         return false
@@ -96,12 +97,14 @@ Dialog {
                 Layout.preferredHeight: 48
                 contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 14 }
                 background: Rectangle { color: "#1e3a5f"; radius: 4 }
-                onClicked: {
-                    backend.setInitialPassword(newPassField.text, confirmPassField.text)
-                    if (backend.isAdminAuthenticated) {
-                        newPassField.text = ""; confirmPassField.text = ""
-                    }
-                }
+                                onClicked: {
+                                    var wasFirst = backend.isFirstRun
+                                    backend.setInitialPassword(newPassField.text, confirmPassField.text)
+                                    if (backend.isAdminAuthenticated) {
+                                        newPassField.text = ""; confirmPassField.text = ""
+                                        if (wasFirst) showSchoolStep = true
+                                    }
+                                }
             }
             Button {
                 text: "Cancel"
@@ -469,6 +472,193 @@ Dialog {
                                 Layout.fillWidth: true
                                 font.pixelSize: 10
                                 visible: backend.rosterImportStatus !== "" && admin.currentTab==="Schedules"
+                            }
+                        }
+                    }
+                    Rectangle {
+                        id: schoolPresetRect
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: schoolPresetCol.implicitHeight + 32
+                        radius: 4
+                        color: "#ffffff"
+                        border.color: "#d1d5db"
+                        ColumnLayout {
+                            id: schoolPresetCol
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 10
+                            RowLayout {
+                                spacing: 8
+                                Layout.fillWidth: true
+                                Rectangle { color: "#14532d"; radius: 4; Layout.preferredWidth: 4; Layout.preferredHeight: 16 }
+                                Label { text: "School Presets"
+                                    color: "#1e3a5f"
+                                    font.bold: true
+                                    font.pixelSize: 14
+                                    Layout.fillWidth: true }
+                                Label { text: backend.schoolPresets.length + " installed"; color: "#475569"; font.pixelSize: 11 }
+                            }
+                            ColumnLayout {
+                                spacing: 8
+                                Layout.fillWidth: true
+                                visible: backend.schoolPresets.length > 0
+                                Repeater {
+                                    model: backend.schoolPresets
+                                    delegate: RowLayout {
+                                        spacing: 8
+                                        Layout.fillWidth: true
+                                        property string presetSlug: modelData.slug
+                                        Label { text: modelData.school; color: "#1e293b"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+                                        Label { text: modelData.template_count + " schedules"; color: "#475569"; font.pixelSize: 11 }
+                                        Button {
+                                            text: "Apply"
+                                            Layout.preferredWidth: 80
+                                            Layout.preferredHeight: 34
+                                            background: Rectangle { color: "#14532d"; radius: 4 }
+                                            contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                            onClicked: backend.applySchoolPreset(presetSlug)
+                                        }
+                                        Button {
+                                            text: "Weekdays"
+                                            Layout.preferredWidth: 90
+                                            Layout.preferredHeight: 34
+                                            background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#1e3a5f"; border.width: 1 }
+                                            contentItem: Text { text: parent.text; color: "#1e3a5f"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                            onClicked: backend.applySchoolPresetWeekdays(presetSlug)
+                                        }
+                                    }
+                                }
+                            }
+                            Label { text: "No presets installed — import one below or start custom above"; color: "#64748b"; font.italic: true; font.pixelSize: 11; Layout.fillWidth: true; visible: backend.schoolPresets.length === 0 }
+                            RowLayout {
+                                spacing: 8
+                                Layout.fillWidth: true
+                                Button {
+                                    text: "Import Preset File"
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 36
+                                    background: Rectangle { color: "#334155"; radius: 4 }
+                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                    onClicked: presetFileDialog.open()
+                                }
+                                Button {
+                                    text: "Browse GitHub"
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 36
+                                    background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#1e3a5f"; border.width: 1 }
+                                    contentItem: Text { text: parent.text; color: "#1e3a5f"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                    onClicked: { backend.refreshRemotePresets(); remoteDialog.open() }
+                                }
+                            }
+                            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#e2e8f0" }
+                            Label { text: "Export my setup"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
+                            GridLayout {
+                                columns: 2
+                                columnSpacing: 8
+                                rowSpacing: 8
+                                Layout.fillWidth: true
+                                TextField { id: expSchool; placeholderText: "School name"; color: "#0f172a"; placeholderTextColor: "#64748b"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
+                                TextField { id: expLocation; placeholderText: "City, ST"; color: "#0f172a"; placeholderTextColor: "#64748b"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
+                                TextField { id: expContributor; placeholderText: "Your name"; color: "#0f172a"; placeholderTextColor: "#64748b"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
+                                TextField { id: expSlug; placeholderText: "file-name"; color: "#0f172a"; placeholderTextColor: "#64748b"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } }
+                            }
+                            Button {
+                                text: "Export to File"
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 36
+                                background: Rectangle { color: "#1e3a5f"; radius: 4 }
+                                contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                onClicked: presetSaveDialog.open()
+                            }
+                        }
+                    }
+                    FileDialog {
+                        id: presetFileDialog
+                        title: "Select School Preset JSON"
+                        nameFilters: ["JSON files (*.json)"]
+                        onAccepted: backend.importSchoolPreset(selectedFile)
+                    }
+                    Dialog {
+                        id: remoteDialog
+                        title: "Shared School Schedules"
+                        modal: true
+                        anchors.centerIn: parent
+                        width: 520
+                        height: 420
+                        standardButtons: Dialog.NoButton
+                        background: Rectangle { color: "#ffffff"; radius: 8; border.color: "#d1d5db" }
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 10
+                            Label { text: "Shared School Schedules"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 15; Layout.fillWidth: true }
+                            Label {
+                                text: backend ? backend.rosterImportStatus : ""
+                                color: "#475569"
+                                font.pixelSize: 11
+                                wrapMode: Text.WordWrap
+                                Layout.fillWidth: true
+                                visible: backend.rosterImportStatus !== ""
+                            }
+                            ScrollView {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                clip: true
+                                ColumnLayout {
+                                    width: parent.width
+                                    spacing: 8
+                                    Repeater {
+                                        model: backend.remotePresets
+                                        delegate: RowLayout {
+                                            spacing: 8
+                                            Layout.fillWidth: true
+                                            property string remoteSlug: modelData.slug
+                                            Label { text: modelData.school; color: "#1e293b"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+                                            Label { text: modelData.location; color: "#64748b"; font.pixelSize: 11; elide: Text.ElideRight }
+                                            Button {
+                                                text: "Install"
+                                                Layout.preferredWidth: 80
+                                                Layout.preferredHeight: 34
+                                                background: Rectangle { color: "#14532d"; radius: 4 }
+                                                contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                                onClicked: backend.installRemotePreset(remoteSlug)
+                                            }
+                                        }
+                                    }
+                                    Label { text: "Nothing here yet"; color: "#64748b"; font.italic: true; font.pixelSize: 12; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; visible: backend.remotePresets.length === 0 }
+                                }
+                            }
+                            RowLayout {
+                                spacing: 12
+                                Layout.fillWidth: true
+                                Button {
+                                    text: "Refresh"
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 40
+                                    background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#d1d5db"; border.width: 1 }
+                                    contentItem: Text { text: parent.text; color: "#1e293b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                                    onClicked: backend.refreshRemotePresets()
+                                }
+                                Button {
+                                    text: "Close"
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 40
+                                    background: Rectangle { color: "#1e3a5f"; radius: 4 }
+                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                                    onClicked: remoteDialog.close()
+                                }
+                            }
+                        }
+                    }
+                    FileDialog {
+                        id: presetSaveDialog
+                        title: "Export School Preset"
+                        fileMode: FileDialog.SaveFile
+                        defaultSuffix: "json"
+                        nameFilters: ["JSON files (*.json)"]
+                        onAccepted: {
+                            if (backend.exportSchoolPreset(expSchool.text, expSlug.text || expSchool.text, expLocation.text, expContributor.text, selectedFile)) {
+                                expSchool.text = ""; expSlug.text = ""; expLocation.text = ""; expContributor.text = ""
                             }
                         }
                     }
@@ -1639,6 +1829,76 @@ Dialog {
                     }
                 }
                 Item { Layout.preferredHeight: 12 }
+            }
+        }
+    }
+
+    Rectangle {
+        id: schoolStep
+        anchors.fill: parent
+        color: "#f5f3ef"
+        radius: 4
+        border.color: "#d1d5db"
+        border.width: 1
+        visible: admin.showSchoolStep && backend.isAdminAuthenticated
+        ColumnLayout {
+            anchors.centerIn: parent
+            width: 460
+            spacing: 14
+            Label {
+                text: "Choose your school"
+                color: "#1e3a5f"
+                font.pixelSize: 20
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                Layout.fillWidth: true
+            }
+            ComboBox {
+                id: schoolPicker
+                Layout.fillWidth: true
+                Layout.preferredHeight: 44
+                model: backend.schoolPresets.map(function(p) { return p.school })
+                background: Rectangle { color: "#ffffff"; border.color: "#1e3a5f"; border.width: 1; radius: 4 }
+                contentItem: Text { text: parent.displayText; color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 12; font.pixelSize: 14; elide: Text.ElideRight }
+            }
+            Label {
+                text: backend.schoolPresets.length ? (backend.schoolPresets[schoolPicker.currentIndex].location + " • " + backend.schoolPresets[schoolPicker.currentIndex].template_count + " schedules") : "No presets installed"
+                color: "#475569"
+                font.pixelSize: 12
+                horizontalAlignment: Text.AlignHCenter
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+            }
+            Button {
+                text: "Use This School"
+                visible: backend.schoolPresets.length > 0
+                Layout.fillWidth: true
+                Layout.preferredHeight: 48
+                contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 14 }
+                background: Rectangle { color: "#14532d"; radius: 4 }
+                onClicked: {
+                    var slug = backend.schoolPresets[schoolPicker.currentIndex].slug
+                    backend.applySchoolPreset(slug)
+                    backend.applySchoolPresetWeekdays(slug)
+                    admin.showSchoolStep = false
+                }
+            }
+            Button {
+                text: "No thanks"
+                Layout.fillWidth: true
+                Layout.preferredHeight: 44
+                contentItem: Text { text: parent.text; color: "#1e293b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 14 }
+                background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#d1d5db"; border.width: 1 }
+                onClicked: admin.showSchoolStep = false
+            }
+            Label {
+                text: backend ? backend.rosterImportStatus : ""
+                color: "#14532d"
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                font.pixelSize: 11
+                visible: backend.rosterImportStatus !== ""
             }
         }
     }

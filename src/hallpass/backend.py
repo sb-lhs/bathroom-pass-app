@@ -1,6 +1,7 @@
 """Qt bridge exposing Python logic to QML."""
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +32,7 @@ from .rosters import (
     set_roster_for_block,
     set_roster_for_block_variant,
 )
-from .schedules import active_block, get_blocks, get_custom_days, get_date_overrides, get_templates, import_date_overrides_csv, import_date_overrides_ics, load_schedules, save_schedules, set_custom_day, set_date_overrides, set_templates, resolve_today_letter
+from .schedules import active_block, get_blocks, get_custom_days, get_date_overrides, get_templates, import_date_overrides_csv, import_date_overrides_ics, load_schedules, save_schedules, set_custom_day, set_date_overrides, set_templates, resolve_today_letter, list_school_presets, apply_school_preset, apply_school_preset_weekdays, export_school_preset, import_school_preset_file, fetch_remote_preset_index, fetch_and_install_remote_preset
 from .state_machine import PassStateMachine, PassType, State
 from .storage import Storage
 
@@ -53,6 +54,7 @@ class Backend(QObject):
     photosChanged = Signal()
     passwordStatusChanged = Signal(str)
     alarmTestStatusChanged = Signal(str)
+    remotePresetsChanged = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -87,6 +89,7 @@ class Backend(QObject):
         self._photos_status = ""
         self._password_status = ""
         self._alarm_test_status = ""
+        self._remote_presets: list = []
         QTimer.singleShot(1000, self._deferred_startup)
         # Daily timer for weekly autodelete
         self._photos_timer = QTimer(self)
@@ -322,6 +325,78 @@ class Backend(QObject):
             return get_weekday_letters()
         except Exception:
             return {}
+
+    @Property(list, notify=scheduleChanged)  # type: ignore
+    def schoolPresets(self) -> list:
+        try:
+            return list_school_presets()
+        except Exception:
+            return []
+
+    @Property(list, notify=remotePresetsChanged)  # type: ignore
+    def remotePresets(self) -> list:
+        try:
+            return list(getattr(self, "_remote_presets", []))
+        except Exception:
+            return []
+
+    def _run_bg(self, fn) -> None:
+        t = threading.Thread(target=fn, daemon=True)
+        t.start()
+
+    @Slot()
+    def refreshRemotePresets(self) -> None:
+        def work() -> None:
+            try:
+                result = fetch_remote_preset_index()
+                self._remote_presets = result.get("entries", [])
+                if result.get("ok"):
+                    if self._remote_presets:
+                        self._roster_import_status = f"Found {len(self._remote_presets)} shared schedule(s)"
+                    else:
+                        self._roster_import_status = "No shared schedules yet — be the first to contribute"
+                else:
+                    self._roster_import_status = str(result.get("error", "fetch failed"))
+                    self._remote_presets = []
+            except Exception as e:
+                self._remote_presets = []
+                self._roster_import_status = f"Fetch failed: {e}"
+            try:
+                self.remotePresetsChanged.emit()
+                self.rosterImportStatusChanged.emit(self._roster_import_status)
+            except Exception:
+                pass
+        self._roster_import_status = "Contacting GitHub…"
+        try:
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+        except Exception:
+            pass
+        self._run_bg(work)
+
+    @Slot(str, result=bool)
+    def installRemotePreset(self, slug: str) -> bool:
+        def work() -> None:
+            try:
+                result = fetch_and_install_remote_preset(slug.strip())
+                if result.get("ok"):
+                    self._roster_import_status = "Installed — tap Apply to use it"
+                else:
+                    errs = result.get("errors", ["install failed"])
+                    self._roster_import_status = "Install failed: " + "; ".join(errs[:2])
+            except Exception as e:
+                self._roster_import_status = f"Install failed: {e}"
+            try:
+                self.scheduleChanged.emit()
+                self.rosterImportStatusChanged.emit(self._roster_import_status)
+            except Exception:
+                pass
+        self._roster_import_status = "Downloading…"
+        try:
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+        except Exception:
+            pass
+        self._run_bg(work)
+        return True
 
     @Property("QVariantMap", notify=scheduleChanged)  # type: ignore
     def dateOverrides(self) -> dict:
@@ -728,6 +803,92 @@ class Backend(QObject):
             self.rosterChanged.emit()
             return True
         except Exception:
+            return False
+
+    @Slot(str, result=str)
+    def applySchoolPreset(self, slug: str) -> str:
+        try:
+            import json as _json
+            result = apply_school_preset(slug.strip())
+            self.scheduleChanged.emit()
+            self._resolve_block()
+            self._update_roster_cache()
+            self.activeBlockChanged.emit(self._block_id)
+            self.rosterChanged.emit()
+            added = result.get("added", [])
+            skipped = result.get("skipped", [])
+            if result.get("error"):
+                self._roster_import_status = "Preset not found"
+            elif added:
+                self._roster_import_status = f"Added {len(added)} schedule(s): " + ", ".join(added)
+            else:
+                self._roster_import_status = "Already up to date"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return _json.dumps(result)
+        except Exception as e:
+            self._roster_import_status = f"Apply failed: {e}"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return "{}"
+
+    @Slot(str, result=bool)
+    def applySchoolPresetWeekdays(self, slug: str) -> bool:
+        try:
+            ok = apply_school_preset_weekdays(slug.strip())
+            if ok:
+                self.scheduleChanged.emit()
+                self._resolve_block()
+                self._update_roster_cache()
+                self.activeBlockChanged.emit(self._block_id)
+                self.rosterChanged.emit()
+                self._roster_import_status = "Weekday mapping applied"
+                self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return ok
+        except Exception:
+            return False
+
+    @Slot(str, result=bool)
+    def importSchoolPreset(self, file_url: str) -> bool:
+        try:
+            path = file_url
+            if path.startswith("file://"):
+                path = QUrl(path).toLocalFile()
+            result = import_school_preset_file(Path(path))
+            if result.get("ok"):
+                self.scheduleChanged.emit()
+                self._roster_import_status = "Preset imported — tap Apply to use it"
+            else:
+                errs = result.get("errors", ["invalid file"])
+                self._roster_import_status = "Import failed: " + "; ".join(errs[:3])
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return bool(result.get("ok"))
+        except Exception as e:
+            self._roster_import_status = f"Import failed: {e}"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return False
+
+    @Slot(str, str, str, str, str, result=bool)
+    def exportSchoolPreset(self, school: str, slug: str, location: str, contributor: str, file_url: str) -> bool:
+        try:
+            result = export_school_preset(school.strip(), slug.strip(), location.strip(), contributor.strip())
+            if not result.get("ok"):
+                errs = result.get("errors", ["invalid setup"])
+                self._roster_import_status = "Export failed: " + "; ".join(errs[:3])
+                self.rosterImportStatusChanged.emit(self._roster_import_status)
+                return False
+            import json as _json
+            path = file_url
+            if path.startswith("file://"):
+                path = QUrl(path).toLocalFile()
+            p = Path(path)
+            if p.suffix.lower() != ".json":
+                p = p.with_suffix(".json")
+            p.write_text(_json.dumps(result["preset"], indent=2), encoding="utf-8")
+            self._roster_import_status = f"Exported {p.name} — submit it as a pull request to schools/"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
+            return True
+        except Exception as e:
+            self._roster_import_status = f"Export failed: {e}"
+            self.rosterImportStatusChanged.emit(self._roster_import_status)
             return False
 
     @Slot(str, str, result=bool)
