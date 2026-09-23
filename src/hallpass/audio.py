@@ -17,6 +17,12 @@ except Exception:
     QTextToSpeech = None  # type: ignore
 
 
+try:
+    _LOOP_INFINITE = int(QSoundEffect.Loop.Infinite)  # type: ignore
+except Exception:
+    _LOOP_INFINITE = -2
+
+
 class AlarmService:
     def __init__(self, sounds_dir: Path | None = None):
         self.sounds_dir = sounds_dir or Path(__file__).parent / "sounds"
@@ -26,7 +32,7 @@ class AlarmService:
         if HAS_QT:
             try:
                 self._effect = QSoundEffect()
-                self._effect.setLoopCount(QSoundEffect.Infinite)  # type: ignore
+                self._effect.setLoopCount(_LOOP_INFINITE)
                 self._effect.setVolume(1.0)
             except Exception:
                 self._effect = None
@@ -85,7 +91,7 @@ class AlarmService:
         return False
 
     def test(self) -> bool:
-        name = self._current or "mixkit-facility-alarm-sound-999.wav"
+        name = self._current or "old_bell_style_ring.wav"
         path = self._resolve(name)
         if not path:
             path = self._resolve(self._current)
@@ -97,7 +103,7 @@ class AlarmService:
                 self._effect.setLoopCount(1)
                 self._effect.play()
                 tried_qt = True
-                self._effect.setLoopCount(QSoundEffect.Infinite)  # type: ignore
+                self._effect.setLoopCount(_LOOP_INFINITE)
             except Exception:
                 tried_qt = False
         if tried_qt:
@@ -118,7 +124,7 @@ class AlarmService:
             try:
                 self._effect.setSource(QUrl.fromLocalFile(str(path)))  # type: ignore
                 self._effect.setVolume(1.0)
-                self._effect.setLoopCount(QSoundEffect.Infinite)  # type: ignore
+                self._effect.setLoopCount(_LOOP_INFINITE)
                 self._effect.play()
                 try:
                     if self._effect.isPlaying():  # type: ignore
