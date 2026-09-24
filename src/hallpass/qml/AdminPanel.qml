@@ -19,6 +19,15 @@ Dialog {
     property bool pendingClose: false
     property var rosterDirty: ({})
     property bool showSchoolStep: false
+    function focusLoginField() {
+        if (backend.isAdminAuthenticated)
+            return
+        if (backend.isFirstRun)
+            newPassField.forceActiveFocus()
+        else
+            pinField.forceActiveFocus()
+    }
+    onOpened: focusLoginField()
     onClosed: { showSchoolStep = false; backend.logoutAdmin() }
     onVisibleChanged: if (!visible) { showSchoolStep = false; backend.logoutAdmin() }
     function hasUnsavedRosters() {
@@ -37,6 +46,8 @@ Dialog {
             pinField.text = ""
         } else {
             pinError.text = "Incorrect password"
+            pinField.forceActiveFocus()
+            pinField.selectAll()
         }
     }
     function submitNewPassword() {
@@ -1146,6 +1157,13 @@ Dialog {
                                             Layout.fillWidth: true
                                             elide: Text.ElideRight
                                         }
+                                        Label {
+                                            text: "● Unsaved"
+                                            color: "#d97706"
+                                            font.pixelSize: 10
+                                            font.bold: true
+                                            visible: rosterField.text !== rosterField.originalText
+                                        }
                                     }
                                     TextField {
                                         id: rosterField
@@ -1170,14 +1188,6 @@ Dialog {
                                             admin.rosterDirty = m
                                         }
                                         onAccepted: saveRoster()
-                                    }
-                                    Label {
-                                        visible: rosterField.text !== rosterField.originalText
-                                        text: "● Unsaved changes"
-                                        color: "#d97706"
-                                        font.pixelSize: 10
-                                        font.bold: true
-                                        Layout.fillWidth: true
                                     }
                                     RowLayout {
                                         spacing: 8
