@@ -119,6 +119,44 @@ class AppConfig:
     camera_picker_shown: bool = False
     simple_mode: bool = False
     simple_roster: list[str] = field(default_factory=list)
+    pass_mode: str = "simple"
+    max_concurrent: int = 1
+    pass_slots: list[str] = field(default_factory=list)
+
+
+PASS_MODES = ("simple", "headcount", "slots")
+MAX_SLOTS = 6
+
+
+def norm_pass_mode(v: Any) -> str:
+    s = str(v or "").strip().lower()
+    return s if s in PASS_MODES else "headcount"
+
+
+def norm_max_concurrent(v: Any) -> int:
+    try:
+        n = int(v)
+    except Exception:
+        return 1
+    return max(1, min(8, n))
+
+
+def norm_pass_slots(v: Any) -> list[str]:
+    if not isinstance(v, list):
+        return []
+    out: list[str] = []
+    for x in v:
+        s = str(x or "").strip()
+        if s and s not in out:
+            out.append(s)
+        if len(out) >= MAX_SLOTS:
+            break
+    return out
+
+
+def replace_config(cfg: AppConfig, **kw: Any) -> AppConfig:
+    import dataclasses
+    return dataclasses.replace(cfg, **kw)
 
     @staticmethod
     def hash_password(password: str, salt: str | None = None) -> tuple[str, str]:
@@ -157,21 +195,7 @@ class AppConfig:
 
     def with_password(self, new_password: str) -> "AppConfig":
         hashed, salt = self.hash_password(new_password)
-        return AppConfig(
-            bathroom_threshold_seconds=self.bathroom_threshold_seconds,
-            water_threshold_seconds=self.water_threshold_seconds,
-            admin_password_hash=hashed,
-            salt=salt,
-            selected_alarm_sound=self.selected_alarm_sound,
-            tts_enabled=self.tts_enabled,
-            active_schedule_profile_override=self.active_schedule_profile_override,
-            first_run=False,
-            default_admin_pass=self.default_admin_pass,
-            selected_camera_index=self.selected_camera_index,
-            camera_picker_shown=self.camera_picker_shown,
-            simple_mode=self.simple_mode,
-            simple_roster=list(self.simple_roster) if self.simple_roster else [],
-        )
+        return replace_config(self, admin_password_hash=hashed, salt=salt, first_run=False)
 
 
 def _ensure_config_exists() -> Path:
@@ -209,6 +233,9 @@ def _ensure_config_exists() -> Path:
         "camera_picker_shown": False,
         "simple_mode": False,
         "simple_roster": [],
+        "pass_mode": "simple",
+        "max_concurrent": 1,
+        "pass_slots": [],
     }
     p.write_text(json.dumps(fallback, indent=2), encoding="utf-8")
     return p
@@ -232,6 +259,9 @@ def _parse_raw_config(raw: dict[str, Any]) -> AppConfig:
         camera_picker_shown=bool(raw.get("camera_picker_shown", False)),
         simple_mode=bool(raw.get("simple_mode", False)),
         simple_roster=list(raw.get("simple_roster", [])),
+        pass_mode=norm_pass_mode(raw.get("pass_mode", "simple")),
+        max_concurrent=norm_max_concurrent(raw.get("max_concurrent", 1)),
+        pass_slots=norm_pass_slots(raw.get("pass_slots", [])),
     )
 
 
@@ -246,20 +276,12 @@ def load_config() -> AppConfig:
             raw: dict[str, Any] = json.loads(p.read_text(encoding="utf-8"))
             base = _parse_raw_config(raw)
             # Override only auth fields for test bypass; keep simple_mode/roster/etc from disk
-            return AppConfig(
-                bathroom_threshold_seconds=base.bathroom_threshold_seconds,
-                water_threshold_seconds=base.water_threshold_seconds,
+            return replace_config(
+                base,
                 admin_password_hash="test",
                 salt="test",
-                selected_alarm_sound=base.selected_alarm_sound,
-                tts_enabled=base.tts_enabled,
-                active_schedule_profile_override=base.active_schedule_profile_override,
                 first_run=False,
                 default_admin_pass=DEFAULT_ADMIN_PASS,
-                selected_camera_index=base.selected_camera_index,
-                camera_picker_shown=base.camera_picker_shown,
-                simple_mode=base.simple_mode,
-                simple_roster=list(base.simple_roster) if base.simple_roster else [],
             )
         except Exception:
             return AppConfig(first_run=False, admin_password_hash="test", salt="test", default_admin_pass=DEFAULT_ADMIN_PASS)
@@ -296,21 +318,7 @@ def set_initial_admin_password(new_password: str) -> AppConfig:
     """Set initial admin password on first run — generates salt, hashes, clears first_run."""
     cfg = load_config()
     hashed, salt = AppConfig.hash_password(new_password)
-    new_cfg = AppConfig(
-        bathroom_threshold_seconds=cfg.bathroom_threshold_seconds,
-        water_threshold_seconds=cfg.water_threshold_seconds,
-        admin_password_hash=hashed,
-        salt=salt,
-        selected_alarm_sound=cfg.selected_alarm_sound,
-        tts_enabled=cfg.tts_enabled,
-        active_schedule_profile_override=cfg.active_schedule_profile_override,
-        first_run=False,
-        default_admin_pass=cfg.default_admin_pass,
-        selected_camera_index=cfg.selected_camera_index,
-        camera_picker_shown=cfg.camera_picker_shown,
-        simple_mode=cfg.simple_mode,
-        simple_roster=list(cfg.simple_roster) if cfg.simple_roster else [],
-    )
+    new_cfg = replace_config(cfg, admin_password_hash=hashed, salt=salt, first_run=False)
     save_config(new_cfg)
     return new_cfg
 

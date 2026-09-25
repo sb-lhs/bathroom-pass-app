@@ -20,6 +20,7 @@ CSV_HEADERS = [
     "Overtime Status",
     "Photo Out Path",
     "Photo In Path",
+    "Slot",
 ]
 
 
@@ -45,6 +46,7 @@ class PassRecord:
     overtime_status: OvertimeStatus
     photo_out_path: str
     photo_in_path: str
+    slot: str = ""
 
 
 def calculate_overtime(duration_seconds: float, pass_type: PassType, bathroom_threshold: int, water_threshold: int) -> OvertimeStatus:
@@ -65,10 +67,17 @@ def _ensure_db(conn: sqlite3.Connection) -> None:
             duration_minutes REAL NOT NULL,
             overtime_status TEXT NOT NULL,
             photo_out_path TEXT NOT NULL,
-            photo_in_path TEXT NOT NULL
+            photo_in_path TEXT NOT NULL,
+            slot TEXT NOT NULL DEFAULT ''
         )
         """
     )
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(pass_logs)").fetchall()]
+        if "slot" not in cols:
+            conn.execute("ALTER TABLE pass_logs ADD COLUMN slot TEXT NOT NULL DEFAULT ''")
+    except Exception:
+        pass
     conn.commit()
 
 
@@ -108,13 +117,14 @@ class Storage:
                     record.overtime_status.value,
                     record.photo_out_path,
                     record.photo_in_path,
+                    record.slot or "",
                 ]
             )
         # SQLite
         with sqlite3.connect(self._db_path) as conn:
             _ensure_db(conn)
             conn.execute(
-                "INSERT INTO pass_logs (student_name, block_id, pass_type, time_out, time_in, duration_minutes, overtime_status, photo_out_path, photo_in_path) VALUES (?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO pass_logs (student_name, block_id, pass_type, time_out, time_in, duration_minutes, overtime_status, photo_out_path, photo_in_path, slot) VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (
                     record.student_name,
                     record.block_id,
@@ -125,6 +135,7 @@ class Storage:
                     record.overtime_status.value,
                     record.photo_out_path,
                     record.photo_in_path,
+                    record.slot or "",
                 ),
             )
             conn.commit()
@@ -133,10 +144,10 @@ class Storage:
         with sqlite3.connect(self._db_path) as conn:
             _ensure_db(conn)
             if limit is not None:
-                rows = conn.execute("SELECT student_name, block_id, pass_type, time_out, time_in, duration_minutes, overtime_status, photo_out_path, photo_in_path FROM pass_logs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+                rows = conn.execute("SELECT student_name, block_id, pass_type, time_out, time_in, duration_minutes, overtime_status, photo_out_path, photo_in_path, slot FROM pass_logs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
                 rows = rows[::-1]
             else:
-                rows = conn.execute("SELECT student_name, block_id, pass_type, time_out, time_in, duration_minutes, overtime_status, photo_out_path, photo_in_path FROM pass_logs ORDER BY id").fetchall()
+                rows = conn.execute("SELECT student_name, block_id, pass_type, time_out, time_in, duration_minutes, overtime_status, photo_out_path, photo_in_path, slot FROM pass_logs ORDER BY id").fetchall()
         result: list[PassRecord] = []
         for r in rows:
             result.append(
@@ -150,6 +161,7 @@ class Storage:
                     overtime_status=OvertimeStatus(r[6]),
                     photo_out_path=r[7],
                     photo_in_path=r[8],
+                    slot=r[9] if len(r) > 9 and r[9] else "",
                 )
             )
         return result
@@ -168,7 +180,7 @@ class Storage:
                 part = paths[i:i + chunk]
                 marks = ",".join("?" for _ in part)
                 rows = conn.execute(
-                    f"SELECT student_name, block_id, pass_type, time_out, time_in, duration_minutes, overtime_status, photo_out_path, photo_in_path FROM pass_logs WHERE photo_out_path IN ({marks}) OR photo_in_path IN ({marks}) ORDER BY id",
+                    f"SELECT student_name, block_id, pass_type, time_out, time_in, duration_minutes, overtime_status, photo_out_path, photo_in_path, slot FROM pass_logs WHERE photo_out_path IN ({marks}) OR photo_in_path IN ({marks}) ORDER BY id",
                     (*part, *part),
                 ).fetchall()
                 for r in rows:
@@ -183,6 +195,7 @@ class Storage:
                             overtime_status=OvertimeStatus(r[6]),
                             photo_out_path=r[7],
                             photo_in_path=r[8],
+                            slot=r[9] if len(r) > 9 and r[9] else "",
                         )
                     except Exception:
                         continue

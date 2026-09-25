@@ -9,5 +9,8 @@
   "tts_enabled": true,
   "active_schedule_profile_override": null,
   "selected_camera_index": 0,
-  "camera_picker_shown": false
+  "camera_picker_shown": false,
+  "pass_mode": "simple",
+  "max_concurrent": 1,
+  "pass_slots": []
 }

@@ -9,7 +9,7 @@ from PySide6.QtCore import QObject, Property, Signal, Slot, QTimer, QUrl
 
 from .audio import AlarmService, TTSService
 from .camera import SilentCamera
-from .config import AppConfig, data_dir, is_first_run, load_config, photos_dir, save_config, set_initial_admin_password, threshold_for
+from .config import MAX_SLOTS, AppConfig, data_dir, is_first_run, load_config, norm_max_concurrent, norm_pass_mode, norm_pass_slots, photos_dir, replace_config, save_config, set_initial_admin_password, threshold_for
 from .export import detect_usb_drives, export_auto
 from .rosters import (
     PROFILE_A,
@@ -56,6 +56,7 @@ class Backend(QObject):
     passwordStatusChanged = Signal(str)
     alarmTestStatusChanged = Signal(str)
     remotePresetsChanged = Signal()
+    passStatusChanged = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -91,6 +92,7 @@ class Backend(QObject):
         self._photos_status = ""
         self._password_status = ""
         self._alarm_test_status = ""
+        self._pass_status = ""
         self._remote_presets: list = []
         QTimer.singleShot(1000, self._deferred_startup)
         # Daily timer for weekly autodelete
@@ -180,7 +182,67 @@ class Backend(QObject):
 
     @Property(list, notify=queueChanged)  # type: ignore
     def queue(self) -> list[dict[str, str]]:
-        return [{"name": q.name, "passType": q.pass_type.value} for q in self.sm.queue_list()]
+        return [{"name": q.name, "passType": q.pass_type.value, "slot": q.slot} for q in self.sm.queue_list()]
+
+    @Property("QVariantMap", notify=queueChanged)  # type: ignore
+    def queuesBySlot(self) -> dict:
+        try:
+            out: dict[str, list] = {}
+            for sk in self.sm.slot_queues.keys():
+                out[sk] = [{"name": q.name, "passType": q.pass_type.value, "slot": q.slot} for q in self.sm.queue_list(sk)]
+            return out
+        except Exception:
+            return {}
+
+    @Property(list, notify=stateChanged)  # type: ignore
+    def activePasses(self) -> list:
+        try:
+            out = []
+            for a in self.sm.active_passes():
+                thresh = threshold_for(a.pass_type.value, self.cfg)
+                out.append({
+                    "key": a.place_key,
+                    "student": a.student_name,
+                    "passType": a.pass_type.value,
+                    "slot": a.slot,
+                    "block": a.block_id,
+                    "elapsed": int(a.elapsed_seconds),
+                    "threshold": int(thresh),
+                    "overtime": bool(a.elapsed_seconds > thresh),
+                    "muted": bool(a.muted),
+                })
+            return out
+        except Exception:
+            return []
+
+    @Property(list, notify=stateChanged)  # type: ignore
+    def freeSlots(self) -> list:
+        try:
+            return list(self.sm.free_places())
+        except Exception:
+            return []
+
+    @Property(str, notify=configChanged)  # type: ignore
+    def passMode(self) -> str:
+        return str(getattr(self.cfg, "pass_mode", "simple") or "simple")
+
+    @Property(int, notify=configChanged)  # type: ignore
+    def maxConcurrent(self) -> int:
+        try:
+            return int(getattr(self.cfg, "max_concurrent", 1) or 1)
+        except Exception:
+            return 1
+
+    @Property(list, notify=configChanged)  # type: ignore
+    def passSlots(self) -> list:
+        try:
+            return list(getattr(self.cfg, "pass_slots", []) or [])
+        except Exception:
+            return []
+
+    @Property(str, notify=passStatusChanged)  # type: ignore
+    def passStatus(self) -> str:
+        return getattr(self, "_pass_status", "")
 
     @Property(str, notify=stateChanged)  # type: ignore
     def stateMode(self) -> str:
@@ -563,6 +625,7 @@ class Backend(QObject):
                     "timeIn": tin,
                     "duration": dur,
                     "date": r.time_out.strftime("%m/%d"),
+                    "slot": r.slot or "",
                 })
             return out
         except Exception:
@@ -823,21 +886,7 @@ class Backend(QObject):
     @Slot(bool, result=bool)
     def setSimpleMode(self, enabled: bool) -> bool:
         try:
-            self.cfg = AppConfig(
-                bathroom_threshold_seconds=self.cfg.bathroom_threshold_seconds,
-                water_threshold_seconds=self.cfg.water_threshold_seconds,
-                admin_password_hash=self.cfg.admin_password_hash,
-                salt=self.cfg.salt,
-                selected_alarm_sound=self.cfg.selected_alarm_sound,
-                tts_enabled=self.cfg.tts_enabled,
-                active_schedule_profile_override=self.cfg.active_schedule_profile_override,
-                first_run=self.cfg.first_run,
-                default_admin_pass=self.cfg.default_admin_pass,
-                selected_camera_index=self.cfg.selected_camera_index,
-                camera_picker_shown=self.cfg.camera_picker_shown,
-                simple_mode=bool(enabled),
-                simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [],
-            )
+            self.cfg = replace_config(self.cfg, simple_mode=bool(enabled))
             save_config(self.cfg)
             if bool(enabled):
                 try:
@@ -867,21 +916,7 @@ class Backend(QObject):
                 if n.strip() and n.strip() not in seen:
                     seen[n.strip()] = n.strip()
             cleaned = list(seen.values())
-            self.cfg = AppConfig(
-                bathroom_threshold_seconds=self.cfg.bathroom_threshold_seconds,
-                water_threshold_seconds=self.cfg.water_threshold_seconds,
-                admin_password_hash=self.cfg.admin_password_hash,
-                salt=self.cfg.salt,
-                selected_alarm_sound=self.cfg.selected_alarm_sound,
-                tts_enabled=self.cfg.tts_enabled,
-                active_schedule_profile_override=self.cfg.active_schedule_profile_override,
-                first_run=self.cfg.first_run,
-                default_admin_pass=self.cfg.default_admin_pass,
-                selected_camera_index=self.cfg.selected_camera_index,
-                camera_picker_shown=self.cfg.camera_picker_shown,
-                simple_mode=self.cfg.simple_mode,
-                simple_roster=cleaned,
-            )
+            self.cfg = replace_config(self.cfg, simple_roster=cleaned)
             save_config(self.cfg)
             if self.cfg.simple_mode:
                 self._update_roster_cache()
@@ -1267,6 +1302,127 @@ class Backend(QObject):
         except Exception:
             return False
 
+    def _set_pass_status(self, msg: str) -> None:
+        self._pass_status = msg
+        try:
+            self.passStatusChanged.emit(msg)
+        except Exception:
+            pass
+
+    @Slot(str, result=bool)
+    def setPassMode(self, mode: str) -> bool:
+        try:
+            m = norm_pass_mode(mode)
+            if m == self.passMode:
+                return True
+            if self.sm.actives:
+                self._set_pass_status("Return all passes before switching modes")
+                return False
+            slots = list(self.cfg.pass_slots) if m == "slots" else []
+            if m == "slots" and not slots:
+                slots = ["Pass 1"]
+            self.cfg = replace_config(self.cfg, pass_mode=m, pass_slots=slots)
+            save_config(self.cfg)
+            self.sm.cfg = self.cfg
+            self.configChanged.emit()
+            self.stateChanged.emit(self.sm.state.value)
+            self.queueChanged.emit()
+            self._set_pass_status(f"Pass mode: {m}" + (f" — rename 'Pass 1' below" if m == "slots" and slots == ["Pass 1"] else ""))
+            return True
+        except Exception as e:
+            self._set_pass_status(f"Mode change failed: {e}")
+            return False
+
+    @Slot(int, result=bool)
+    def setMaxConcurrent(self, n: int) -> bool:
+        try:
+            self.cfg = replace_config(self.cfg, max_concurrent=norm_max_concurrent(n))
+            save_config(self.cfg)
+            self.sm.cfg = self.cfg
+            self.configChanged.emit()
+            self.stateChanged.emit(self.sm.state.value)
+            self._set_pass_status(f"Up to {self.cfg.max_concurrent} out before queueing")
+            return True
+        except Exception as e:
+            self._set_pass_status(f"Failed: {e}")
+            return False
+
+    @Slot(str, result=bool)
+    def addPassSlot(self, name: str) -> bool:
+        try:
+            clean = str(name or "").strip()
+            if not clean:
+                return False
+            slots = list(self.cfg.pass_slots)
+            if clean in slots:
+                self._set_pass_status(f"'{clean}' already exists")
+                return False
+            if len(slots) >= MAX_SLOTS:
+                self._set_pass_status(f"Max {MAX_SLOTS} slots")
+                return False
+            slots.append(clean)
+            self.cfg = replace_config(self.cfg, pass_slots=slots)
+            save_config(self.cfg)
+            self.sm.cfg = self.cfg
+            self.configChanged.emit()
+            self.stateChanged.emit(self.sm.state.value)
+            self._set_pass_status(f"Added '{clean}'")
+            return True
+        except Exception as e:
+            self._set_pass_status(f"Failed: {e}")
+            return False
+
+    @Slot(str, str, result=bool)
+    def renamePassSlot(self, old: str, new: str) -> bool:
+        try:
+            old_s, new_s = old.strip(), new.strip()
+            if not new_s or old_s == new_s:
+                return False
+            slots = list(self.cfg.pass_slots)
+            if old_s not in slots or new_s in slots:
+                self._set_pass_status("Name taken or missing")
+                return False
+            if old_s in self.sm.actives or old_s in self.sm.slot_queues and self.sm.slot_queues[old_s]:
+                self._set_pass_status("Slot in use — return its pass first")
+                return False
+            slots[slots.index(old_s)] = new_s
+            self.cfg = replace_config(self.cfg, pass_slots=slots)
+            save_config(self.cfg)
+            self.sm.cfg = self.cfg
+            self.configChanged.emit()
+            self.stateChanged.emit(self.sm.state.value)
+            self._set_pass_status(f"Renamed to '{new_s}'")
+            return True
+        except Exception as e:
+            self._set_pass_status(f"Failed: {e}")
+            return False
+
+    @Slot(str, result=bool)
+    def deletePassSlot(self, name: str) -> bool:
+        try:
+            target = name.strip()
+            slots = list(self.cfg.pass_slots)
+            if target not in slots:
+                return False
+            if len(slots) <= 1:
+                self._set_pass_status("Keep at least one slot")
+                return False
+            if target in self.sm.actives or (target in self.sm.slot_queues and self.sm.slot_queues[target]):
+                self._set_pass_status("Slot in use — return its pass first")
+                return False
+            slots.remove(target)
+            self.cfg = replace_config(self.cfg, pass_slots=slots)
+            save_config(self.cfg)
+            self.sm.cfg = self.cfg
+            self.configChanged.emit()
+            self.stateChanged.emit(self.sm.state.value)
+            self.queueChanged.emit()
+            self._set_pass_status(f"Deleted '{target}'")
+            return True
+        except Exception as e:
+            self._set_pass_status(f"Failed: {e}")
+            return False
+
     @Slot(result=int)
     def flipWeekdayLetters(self) -> int:
         try:
@@ -1478,33 +1634,42 @@ class Backend(QObject):
 
     # --- Slots ---
     @Slot(str, str)
-    def selectStudent(self, name: str, pass_type: str) -> None:
+    @Slot(str, str, str)
+    def selectStudent(self, name: str, pass_type: str, slot: str = "") -> None:
         self._resolve_block()
         self._update_roster_cache()
         pt = PassType.Water if pass_type == "Water" else PassType.Bathroom
         photo = self.camera.capture("out", student=name, block=self._block_id or "NoBlock")
-        ok = self.sm.select_student(name, pt, photo)
-        if ok:
-            self._elapsed = 0
+        key = self.sm.select_student(name, pt, photo, slot or "")
+        if key:
+            prim = self.sm.active
+            self._elapsed = int(prim.elapsed_seconds) if prim else 0
             self.stateChanged.emit(self.sm.state.value)
             self.elapsedChanged.emit(self._elapsed)
             self.queueChanged.emit()
             self.photosChanged.emit()
+        else:
+            # No free place — fall back to queue so the tap is never lost
+            if self.sm.enqueue(name, pt, photo, slot or ""):
+                self.queueChanged.emit()
+                self.photosChanged.emit()
 
     @Slot(str, str)
-    def enqueue(self, name: str, pass_type: str) -> None:
+    @Slot(str, str, str)
+    def enqueue(self, name: str, pass_type: str, slot: str = "") -> None:
         self._resolve_block()
         self._update_roster_cache()
         pt = PassType.Water if pass_type == "Water" else PassType.Bathroom
         photo = self.camera.capture("out", student=name, block=self._block_id or "NoBlock")
-        if self.sm.enqueue(name, pt, photo):
+        if self.sm.enqueue(name, pt, photo, slot or ""):
             self.queueChanged.emit()
             self.photosChanged.emit()
 
     @Slot(str, result=bool)
-    def cancelQueue(self, name: str) -> bool:
+    @Slot(str, str, result=bool)
+    def cancelQueue(self, name: str, slot: str = "") -> bool:
         try:
-            if self.sm.cancel_queued(name.strip()):
+            if self.sm.cancel_queued(name.strip(), slot or ""):
                 self.queueChanged.emit()
                 self.historyChanged.emit()
                 self.photosChanged.emit()
@@ -1514,14 +1679,17 @@ class Backend(QObject):
             return False
 
     @Slot()
-    def returnPass(self) -> None:
-        # Capture 'in' with current active student's name/block (the returning student's block, not current time's)
-        active_name = self.sm.active.student_name if self.sm.active else ""
-        active_block = self.sm.active.block_id if self.sm.active else self._block_id
+    @Slot(str)
+    def returnPass(self, key: str = "") -> None:
+        # Capture 'in' with the returning student's name/block, not current time's
+        target = self.sm.actives.get(key) if key else self.sm.active
+        active_name = target.student_name if target else ""
+        active_block = target.block_id if target else self._block_id
         # Don't re-resolve here — use the block the pass was started in
         photo_in = self.camera.capture("in", student=active_name, block=active_block or "NoBlock")
-        rec = self.sm.return_pass(photo_in)
-        self._elapsed = 0
+        rec = self.sm.return_pass(photo_in, key or None)
+        prim = self.sm.active
+        self._elapsed = int(prim.elapsed_seconds) if prim else 0
         self.stateChanged.emit(self.sm.state.value)
         self.elapsedChanged.emit(self._elapsed)
         self.queueChanged.emit()
@@ -1529,8 +1697,9 @@ class Backend(QObject):
         self.photosChanged.emit()
 
     @Slot()
-    def muteAlarm(self) -> None:
-        self.sm.mute_alarm()
+    @Slot(str)
+    def muteAlarm(self, key: str = "") -> None:
+        self.sm.mute_alarm(key or None)
         self.stateChanged.emit(self.sm.state.value)
 
     @Slot(str, str, result=bool)
@@ -1614,21 +1783,7 @@ class Backend(QObject):
     def setSelectedCameraIndex(self, idx: int) -> bool:
         try:
             idx = int(idx)
-            self.cfg = AppConfig(
-                bathroom_threshold_seconds=self.cfg.bathroom_threshold_seconds,
-                water_threshold_seconds=self.cfg.water_threshold_seconds,
-                admin_password_hash=self.cfg.admin_password_hash,
-                salt=self.cfg.salt,
-                selected_alarm_sound=self.cfg.selected_alarm_sound,
-                tts_enabled=self.cfg.tts_enabled,
-                active_schedule_profile_override=self.cfg.active_schedule_profile_override,
-                first_run=self.cfg.first_run,
-                default_admin_pass=self.cfg.default_admin_pass,
-                selected_camera_index=idx,
-                camera_picker_shown=True,
-                simple_mode=self.cfg.simple_mode,
-                simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [],
-            )
+            self.cfg = replace_config(self.cfg, selected_camera_index=idx, camera_picker_shown=True)
             save_config(self.cfg)
             # Update camera
             try:
@@ -1645,21 +1800,7 @@ class Backend(QObject):
     @Slot(result=bool)
     def markCameraPickerShown(self) -> bool:
         try:
-            self.cfg = AppConfig(
-                bathroom_threshold_seconds=self.cfg.bathroom_threshold_seconds,
-                water_threshold_seconds=self.cfg.water_threshold_seconds,
-                admin_password_hash=self.cfg.admin_password_hash,
-                salt=self.cfg.salt,
-                selected_alarm_sound=self.cfg.selected_alarm_sound,
-                tts_enabled=self.cfg.tts_enabled,
-                active_schedule_profile_override=self.cfg.active_schedule_profile_override,
-                first_run=self.cfg.first_run,
-                default_admin_pass=self.cfg.default_admin_pass,
-                selected_camera_index=self.cfg.selected_camera_index,
-                camera_picker_shown=True,
-                simple_mode=self.cfg.simple_mode,
-                simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [],
-            )
+            self.cfg = replace_config(self.cfg, camera_picker_shown=True)
             save_config(self.cfg)
             self.configChanged.emit()
             return True
@@ -1711,21 +1852,7 @@ class Backend(QObject):
 
     @Slot(str)
     def setAlarmSound(self, name: str) -> None:
-        self.cfg = AppConfig(
-            bathroom_threshold_seconds=self.cfg.bathroom_threshold_seconds,
-            water_threshold_seconds=self.cfg.water_threshold_seconds,
-            admin_password_hash=self.cfg.admin_password_hash,
-            salt=self.cfg.salt,
-            selected_alarm_sound=name,
-            tts_enabled=self.cfg.tts_enabled,
-            active_schedule_profile_override=self.cfg.active_schedule_profile_override,
-            first_run=self.cfg.first_run,
-            default_admin_pass=self.cfg.default_admin_pass,
-            selected_camera_index=self.cfg.selected_camera_index,
-            camera_picker_shown=self.cfg.camera_picker_shown,
-            simple_mode=self.cfg.simple_mode,
-            simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [],
-        )
+        self.cfg = replace_config(self.cfg, selected_alarm_sound=name)
         save_config(self.cfg)
         self.sm.cfg = self.cfg
         self.alarm.set_sound(name)
@@ -1748,21 +1875,7 @@ class Backend(QObject):
 
     @Slot(bool)
     def setTtsEnabled(self, enabled: bool) -> None:
-        self.cfg = AppConfig(
-            bathroom_threshold_seconds=self.cfg.bathroom_threshold_seconds,
-            water_threshold_seconds=self.cfg.water_threshold_seconds,
-            admin_password_hash=self.cfg.admin_password_hash,
-            salt=self.cfg.salt,
-            selected_alarm_sound=self.cfg.selected_alarm_sound,
-            tts_enabled=enabled,
-            active_schedule_profile_override=self.cfg.active_schedule_profile_override,
-            first_run=self.cfg.first_run,
-            default_admin_pass=self.cfg.default_admin_pass,
-            selected_camera_index=self.cfg.selected_camera_index,
-            camera_picker_shown=self.cfg.camera_picker_shown,
-            simple_mode=self.cfg.simple_mode,
-            simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [],
-        )
+        self.cfg = replace_config(self.cfg, tts_enabled=enabled)
         save_config(self.cfg)
         self.sm.cfg = self.cfg
         self.configChanged.emit()
@@ -1771,38 +1884,10 @@ class Backend(QObject):
     def adjustThreshold(self, pass_type: str, delta: int) -> None:
         if pass_type == "Bathroom":
             new_val = max(60, self.cfg.bathroom_threshold_seconds + delta)
-            self.cfg = AppConfig(
-                bathroom_threshold_seconds=new_val,
-                water_threshold_seconds=self.cfg.water_threshold_seconds,
-                admin_password_hash=self.cfg.admin_password_hash,
-                salt=self.cfg.salt,
-                selected_alarm_sound=self.cfg.selected_alarm_sound,
-                tts_enabled=self.cfg.tts_enabled,
-                active_schedule_profile_override=self.cfg.active_schedule_profile_override,
-                first_run=self.cfg.first_run,
-                default_admin_pass=self.cfg.default_admin_pass,
-                selected_camera_index=self.cfg.selected_camera_index,
-                camera_picker_shown=self.cfg.camera_picker_shown,
-                simple_mode=self.cfg.simple_mode,
-                simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [],
-            )
+            self.cfg = replace_config(self.cfg, bathroom_threshold_seconds=new_val)
         else:
             new_val = max(60, self.cfg.water_threshold_seconds + delta)
-            self.cfg = AppConfig(
-                bathroom_threshold_seconds=self.cfg.bathroom_threshold_seconds,
-                water_threshold_seconds=new_val,
-                admin_password_hash=self.cfg.admin_password_hash,
-                salt=self.cfg.salt,
-                selected_alarm_sound=self.cfg.selected_alarm_sound,
-                tts_enabled=self.cfg.tts_enabled,
-                active_schedule_profile_override=self.cfg.active_schedule_profile_override,
-                first_run=self.cfg.first_run,
-                default_admin_pass=self.cfg.default_admin_pass,
-                selected_camera_index=self.cfg.selected_camera_index,
-                camera_picker_shown=self.cfg.camera_picker_shown,
-                simple_mode=self.cfg.simple_mode,
-                simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [],
-            )
+            self.cfg = replace_config(self.cfg, water_threshold_seconds=new_val)
         save_config(self.cfg)
         self.sm.cfg = self.cfg
         self.configChanged.emit()
@@ -1832,21 +1917,7 @@ class Backend(QObject):
             letter = profile
         else:
             letter = "A"
-        self.cfg = AppConfig(
-            bathroom_threshold_seconds=self.cfg.bathroom_threshold_seconds,
-            water_threshold_seconds=self.cfg.water_threshold_seconds,
-            admin_password_hash=self.cfg.admin_password_hash,
-            salt=self.cfg.salt,
-            selected_alarm_sound=self.cfg.selected_alarm_sound,
-            tts_enabled=self.cfg.tts_enabled,
-            active_schedule_profile_override=letter,
-            first_run=self.cfg.first_run,
-            default_admin_pass=self.cfg.default_admin_pass,
-            selected_camera_index=self.cfg.selected_camera_index,
-            camera_picker_shown=self.cfg.camera_picker_shown,
-            simple_mode=self.cfg.simple_mode,
-            simple_roster=list(self.cfg.simple_roster) if self.cfg.simple_roster else [],
-        )
+        self.cfg = replace_config(self.cfg, active_schedule_profile_override=letter)
         save_config(self.cfg)
         self.sm.cfg = self.cfg
         self._profile = f"Block_{letter}_Schedule" if letter in ("A","B") else "Block_A_Schedule"
@@ -1931,14 +2002,12 @@ class Backend(QObject):
 
     # Internal
     def _tick(self) -> None:
-        if self.sm.active:
-            self._elapsed = int((__import__("datetime").datetime.now() - self.sm.active.time_out).total_seconds())
-            self.sm.tick(self._elapsed)
+        if self.sm.actives:
+            self.sm.tick()
+            prim = self.sm.active
+            self._elapsed = int(prim.elapsed_seconds) if prim else 0
             self.elapsedChanged.emit(self._elapsed)
-            if self.sm.is_overtime():
-                self.stateChanged.emit(State.OVERTIME.value)
-            else:
-                self.stateChanged.emit(self.sm.state.value)
+            self.stateChanged.emit(self.sm.state.value)
         else:
             self._tick_count += 1
             if self._tick_count < 5:

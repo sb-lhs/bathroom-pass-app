@@ -1694,6 +1694,101 @@ Dialog {
                         rowSpacing: 16
                         Layout.fillWidth: true
                         Rectangle {
+                            Layout.columnSpan: 2
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: passModeCol.implicitHeight + 32
+                            radius: 4
+                            color: "#ffffff"
+                            border.color: "#1e3a5f"
+                            border.width: 1
+                            ColumnLayout {
+                                id: passModeCol
+                                anchors.fill: parent
+                                anchors.margins: 16
+                                spacing: 10
+                                RowLayout {
+                                    spacing: 8
+                                    Layout.fillWidth: true
+                                    Rectangle { color: "#1e3a5f"; radius: 4; Layout.preferredWidth: 4; Layout.preferredHeight: 16 }
+                                    Label { text: "Passes Out"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 13; Layout.fillWidth: true }
+                                    ComboBox {
+                                        id: passModeBox
+                                        model: ["simple", "headcount", "slots"]
+                                        currentIndex: Math.max(0, ["simple", "headcount", "slots"].indexOf(backend.passMode))
+                                        Layout.preferredWidth: 170
+                                        Layout.preferredHeight: 36
+                                        background: Rectangle { color: "#ffffff"; border.color: "#1e3a5f"; border.width: 1; radius: 4 }
+                                        contentItem: Text { text: parent.displayText === "slots" ? "Named slots" : (parent.displayText === "headcount" ? "Headcount" : "Simple — one pass"); color: "#1e293b"; verticalAlignment: Text.AlignVCenter; leftPadding: 10; font.pixelSize: 12; font.bold: true }
+                                        delegate: ItemDelegate { width: parent.width; contentItem: Text { text: modelData === "slots" ? "Named slots" : (modelData === "headcount" ? "Headcount" : "Simple — one pass"); color: "#0f172a"; font.pixelSize: 12 } background: Rectangle { color: highlighted ? "#e2e8f0" : "#ffffff" } }
+                                        onActivated: { if (!backend.setPassMode(currentText)) currentIndex = Math.max(0, ["simple", "headcount", "slots"].indexOf(backend.passMode)) }
+                                    }
+                                }
+                                RowLayout {
+                                    spacing: 8
+                                    Layout.fillWidth: true
+                                    visible: backend.passMode === "headcount"
+                                    Label { text: "Up to"; color: "#334155"; font.pixelSize: 12 }
+                                    Rectangle {
+                                        color: "#f1f5f9"; radius: 4; border.color: "#d1d5db"; border.width: 1
+                                        Layout.preferredWidth: 60; Layout.preferredHeight: 40
+                                        Label { anchors.centerIn: parent; text: backend.maxConcurrent; color: "#1e3a5f"; font.pixelSize: 16; font.bold: true }
+                                    }
+                                    Label { text: "out before queueing"; color: "#334155"; font.pixelSize: 12; Layout.fillWidth: true }
+                                    Button {
+                                        text: "−"; Layout.preferredWidth: 48; Layout.preferredHeight: 40
+                                        contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 14 }
+                                        background: Rectangle { color: "#334155"; radius: 4 }
+                                        onClicked: backend.setMaxConcurrent(backend.maxConcurrent - 1)
+                                    }
+                                    Button {
+                                        text: "+"; Layout.preferredWidth: 48; Layout.preferredHeight: 40
+                                        contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 14 }
+                                        background: Rectangle { color: "#1e3a5f"; radius: 4 }
+                                        onClicked: backend.setMaxConcurrent(backend.maxConcurrent + 1)
+                                    }
+                                }
+                                ColumnLayout {
+                                    spacing: 6
+                                    Layout.fillWidth: true
+                                    visible: backend.passMode === "slots"
+                                    Repeater {
+                                        model: backend.passSlots
+                                        delegate: RowLayout {
+                                            spacing: 8
+                                            Layout.fillWidth: true
+                                            property string slotOrig: modelData
+                                            TextField {
+                                                text: modelData
+                                                color: "#0f172a"; selectionColor: "#3b82f6"; selectedTextColor: "white"
+                                                Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12
+                                                background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 }
+                                                onAccepted: if (!backend.renamePassSlot(slotOrig, text)) text = slotOrig
+                                                onEditingFinished: if (text !== slotOrig && !backend.renamePassSlot(slotOrig, text)) text = slotOrig
+                                            }
+                                            Button {
+                                                text: "X"; Layout.preferredWidth: 40; Layout.preferredHeight: 36
+                                                contentItem: Text { text: parent.text; color: "#991b1b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                                background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#991b1b" }
+                                                onClicked: backend.deletePassSlot(slotOrig)
+                                            }
+                                        }
+                                    }
+                                    RowLayout {
+                                        spacing: 8
+                                        Layout.fillWidth: true
+                                        TextField { id: newSlotName; placeholderText: "New pass name (e.g., Boys pass)"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#14532d"; border.width: 1; radius: 4 } onAccepted: if (backend.addPassSlot(newSlotName.text)) newSlotName.text = "" }
+                                        Button {
+                                            text: "Add"; Layout.preferredWidth: 70; Layout.preferredHeight: 36
+                                            contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                            background: Rectangle { color: "#14532d"; radius: 4 }
+                                            onClicked: if (backend.addPassSlot(newSlotName.text)) newSlotName.text = ""
+                                        }
+                                    }
+                                }
+                                Label { text: backend.passStatus; color: (backend.passStatus.indexOf("Return all") >= 0 || backend.passStatus.indexOf("Keep at least") >= 0 || backend.passStatus.indexOf("in use") >= 0 || backend.passStatus.indexOf("Failed") >= 0 || backend.passStatus.indexOf("already exists") >= 0 || backend.passStatus.indexOf("taken or missing") >= 0 || backend.passStatus.indexOf("Max ") >= 0) ? "#991b1b" : "#14532d"; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true; visible: backend.passStatus !== "" }
+                            }
+                        }
+                        Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 160
                             radius: 4
