@@ -12,5 +12,9 @@
   "camera_picker_shown": false,
   "pass_mode": "simple",
   "max_concurrent": 1,
-  "pass_slots": []
+  "pass_slots": [],
+  "quota_daily_bathroom": 0,
+  "quota_daily_water": 0,
+  "quota_per_block": 0,
+  "quota_overrides": {}
 }

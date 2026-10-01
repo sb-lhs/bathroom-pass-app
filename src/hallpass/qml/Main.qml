@@ -26,6 +26,15 @@ ApplicationWindow {
     property string passMode: backend ? backend.passMode : "headcount"
     property var passSlots: backend ? backend.passSlots : []
     property var queuesBySlot: backend ? backend.queuesBySlot : ({})
+    property string kioskNotice: backend ? backend.kioskNotice : ""
+    property string voidKey: ""
+    Timer {
+        id: noticeTimer
+        interval: 5000
+        running: kioskNotice !== ""
+        repeat: false
+        onTriggered: backend.clearNotice()
+    }
     function goPass(passType) {
         var slot = ""
         if (passMode === "slots") {
@@ -128,6 +137,28 @@ ApplicationWindow {
         anchors.fill: parent
         anchors.margins: 16
         spacing: 16
+        Rectangle {
+            visible: kioskNotice !== ""
+            Layout.fillWidth: true
+            Layout.preferredHeight: 56
+            radius: 8
+            color: "#fef9c3"
+            border.color: "#f59e0b"
+            border.width: 2
+            Label {
+                anchors.fill: parent
+                anchors.margins: 8
+                text: kioskNotice
+                color: "#92400e"
+                font.family: "Source Sans Pro"
+                font.pixelSize: 22
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
+            }
+            MouseArea { anchors.fill: parent; onClicked: backend.clearNotice() }
+        }
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -437,16 +468,30 @@ ApplicationWindow {
                                 Layout.preferredHeight: 8
                                 value: modelData.threshold>0 ? Math.min(1, modelData.elapsed/modelData.threshold) : 0
                             }
-                            Button {
+                            RowLayout {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 56
-                                text: "Return Pass"
-                                font.family: "Source Sans Pro"
-                                font.pixelSize: 24
-                                font.bold: true
-                                background: Rectangle { color: "#1e3a5f"; radius: 6 }
-                                contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "Source Sans Pro"; font.pixelSize: 24; font.bold: true }
-                                onClicked: backend.returnPass(modelData.key)
+                                spacing: 8
+                                Button {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 56
+                                    text: "Return Pass"
+                                    font.family: "Source Sans Pro"
+                                    font.pixelSize: 24
+                                    font.bold: true
+                                    background: Rectangle { color: "#1e3a5f"; radius: 6 }
+                                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "Source Sans Pro"; font.pixelSize: 24; font.bold: true }
+                                    onClicked: backend.returnPass(modelData.key)
+                                }
+                                Button {
+                                    Layout.preferredWidth: 76
+                                    Layout.preferredHeight: 56
+                                    text: "Void"
+                                    font.family: "Source Sans Pro"
+                                    font.pixelSize: 18
+                                    background: Rectangle { color: "#ffffff"; radius: 6; border.color: "#991b1b"; border.width: 1 }
+                                    contentItem: Text { text: parent.text; color: "#991b1b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "Source Sans Pro"; font.pixelSize: 18; font.bold: true }
+                                    onClicked: { root.voidKey = modelData.key; voidName.text = modelData.student; voidPass.text = ""; voidError.text = ""; voidDialog.open() }
+                                }
                             }
                         }
                     }
@@ -691,6 +736,68 @@ ApplicationWindow {
     // Dialogs
     QueueDialog { id: queueDialog }
     AdminPanel { id: adminDialog }
+    Dialog {
+        id: voidDialog
+        title: "Void Pass"
+        modal: true
+        anchors.centerIn: parent
+        width: 420
+        height: 300
+        standardButtons: Dialog.NoButton
+        background: Rectangle { color: "#ffffff"; radius: 8; border.color: "#991b1b"; border.width: 2 }
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 16
+            spacing: 12
+            Label { text: "Void pass for " + voidName.text + "?"; color: "#1e293b"; font.bold: true; font.pixelSize: 18; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Label { text: "Teacher password required. The pass is logged as voided, not counted."; color: "#475569"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Label { id: voidName; visible: false; text: "" }
+            TextField {
+                id: voidPass
+                echoMode: TextInput.Password
+                placeholderText: "Teacher password"
+                font.pixelSize: 18
+                Layout.fillWidth: true
+                Layout.preferredHeight: 48
+                color: "#1e293b"
+                placeholderTextColor: "#64748b"
+                background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
+                onAccepted: voidDialog.tryVoid()
+            }
+            Label { id: voidError; text: ""; color: "#991b1b"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true; visible: text !== "" }
+            RowLayout {
+                spacing: 12
+                Layout.fillWidth: true
+                Button {
+                    text: "Keep Pass"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 48
+                    background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#d1d5db"; border.width: 1 }
+                    contentItem: Text { text: parent.text; color: "#1e293b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                    onClicked: voidDialog.close()
+                }
+                Button {
+                    text: "Void It"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 48
+                    background: Rectangle { color: "#991b1b"; radius: 4 }
+                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                    onClicked: voidDialog.tryVoid()
+                }
+            }
+        }
+        function tryVoid() {
+            if (backend.voidActivePass(root.voidKey, voidPass.text)) {
+                voidPass.text = ""
+                root.voidKey = ""
+                voidDialog.close()
+            } else {
+                voidError.text = "Wrong password — pass kept"
+                voidPass.text = ""
+                voidPass.forceActiveFocus()
+            }
+        }
+    }
 
     // Pass type chooser dialog component
     // Defined inline for simplicity if external file missing

@@ -33,6 +33,7 @@ from .rosters import (
     set_roster_for_block,
     set_roster_for_block_variant,
 )
+from .quotas import check_quota, grant_override, limits_for
 from .schedules import active_block, active_blocks, flip_weekday_letters, format_12h, get_blocks, get_custom_days, get_date_overrides, get_templates, import_date_overrides_csv, import_date_overrides_ics, load_schedules, parse_time_input, save_schedules, set_custom_day, set_date_overrides, set_templates, resolve_today_letter, list_school_presets, apply_school_preset, apply_school_preset_weekdays, export_school_preset, import_school_preset_file, fetch_remote_preset_index, fetch_and_install_remote_preset
 from .state_machine import PassStateMachine, PassType, State
 from .storage import Storage
@@ -57,6 +58,7 @@ class Backend(QObject):
     alarmTestStatusChanged = Signal(str)
     remotePresetsChanged = Signal()
     passStatusChanged = Signal(str)
+    noticeChanged = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -93,6 +95,7 @@ class Backend(QObject):
         self._password_status = ""
         self._alarm_test_status = ""
         self._pass_status = ""
+        self._notice = ""
         self._remote_presets: list = []
         QTimer.singleShot(1000, self._deferred_startup)
         # Daily timer for weekly autodelete
@@ -243,6 +246,119 @@ class Backend(QObject):
     @Property(str, notify=passStatusChanged)  # type: ignore
     def passStatus(self) -> str:
         return getattr(self, "_pass_status", "")
+
+    @Property(str, notify=noticeChanged)  # type: ignore
+    def kioskNotice(self) -> str:
+        return getattr(self, "_notice", "")
+
+    @Slot()
+    def clearNotice(self) -> None:
+        self._notice = ""
+        try:
+            self.noticeChanged.emit("")
+        except Exception:
+            pass
+
+    @Property(int, notify=configChanged)  # type: ignore
+    def quotaDailyBathroom(self) -> int:
+        return int(getattr(self.cfg, "quota_daily_bathroom", 0) or 0)
+
+    @Property(int, notify=configChanged)  # type: ignore
+    def quotaDailyWater(self) -> int:
+        return int(getattr(self.cfg, "quota_daily_water", 0) or 0)
+
+    @Property(int, notify=configChanged)  # type: ignore
+    def quotaPerBlock(self) -> int:
+        return int(getattr(self.cfg, "quota_per_block", 0) or 0)
+
+    @Property(list, notify=configChanged)  # type: ignore
+    def quotaOverrides(self) -> list:
+        try:
+            over = getattr(self.cfg, "quota_overrides", {}) or {}
+            return [{"student": k, "daily_bathroom": v.get("daily_bathroom", 0), "daily_water": v.get("daily_water", 0), "per_block": v.get("per_block", 0)} for k, v in sorted(over.items(), key=lambda kv: kv[0].lower())]
+        except Exception:
+            return []
+
+    @Property(list, notify=historyChanged)  # type: ignore
+    def denialsToday(self) -> list:
+        try:
+            from datetime import datetime as _dt
+            return self.storage.get_denials(day=_dt.now().strftime("%Y-%m-%d"), limit=20)
+        except Exception:
+            return []
+
+    @Slot(int, int, int, result=bool)
+    def setQuotas(self, daily_b: int, daily_w: int, per_block: int) -> bool:
+        try:
+            from .config import norm_quota_count
+            self.cfg = replace_config(
+                self.cfg,
+                quota_daily_bathroom=norm_quota_count(daily_b),
+                quota_daily_water=norm_quota_count(daily_w),
+                quota_per_block=norm_quota_count(per_block),
+            )
+            save_config(self.cfg)
+            self.configChanged.emit()
+            self._set_pass_status("Quotas saved (0 = unlimited)")
+            return True
+        except Exception as e:
+            self._set_pass_status(f"Failed: {e}")
+            return False
+
+    @Slot(str, int, int, int, result=bool)
+    def setStudentQuota(self, name: str, daily_b: int, daily_w: int, per_block: int) -> bool:
+        try:
+            from .config import norm_quota_count
+            clean = str(name or "").strip()
+            if not clean:
+                return False
+            over = dict(getattr(self.cfg, "quota_overrides", {}) or {})
+            entry = {
+                "daily_bathroom": norm_quota_count(daily_b),
+                "daily_water": norm_quota_count(daily_w),
+                "per_block": norm_quota_count(per_block),
+            }
+            if any(entry.values()):
+                over[clean] = entry
+            elif clean in over:
+                del over[clean]
+            self.cfg = replace_config(self.cfg, quota_overrides=over)
+            save_config(self.cfg)
+            self.configChanged.emit()
+            self._set_pass_status(f"Quota set for {clean}" if any(entry.values()) else f"Quota cleared for {clean}")
+            return True
+        except Exception as e:
+            self._set_pass_status(f"Failed: {e}")
+            return False
+
+    @Slot(str, result=bool)
+    def clearStudentQuota(self, name: str) -> bool:
+        try:
+            clean = str(name or "").strip()
+            over = dict(getattr(self.cfg, "quota_overrides", {}) or {})
+            if clean in over:
+                del over[clean]
+                self.cfg = replace_config(self.cfg, quota_overrides=over)
+                save_config(self.cfg)
+                self.configChanged.emit()
+            self._set_pass_status(f"Quota cleared for {clean}")
+            return True
+        except Exception as e:
+            self._set_pass_status(f"Failed: {e}")
+            return False
+
+    @Slot(str, result=bool)
+    def grantQuotaOverride(self, name: str) -> bool:
+        try:
+            clean = str(name or "").strip()
+            if not clean:
+                return False
+            grant_override(clean)
+            self._set_pass_status(f"One extra pass granted for {clean} (today only)")
+            return True
+        except Exception as e:
+            self._set_pass_status(f"Failed: {e}")
+            return False
 
     @Property(str, notify=stateChanged)  # type: ignore
     def stateMode(self) -> str:
@@ -1633,12 +1749,29 @@ class Backend(QObject):
             return False
 
     # --- Slots ---
+    def _deny_notice(self, name: str, label: str, reason: str, slot: str = "") -> None:
+        try:
+            self.storage.log_denied(name, self._block_id, label, slot or "", reason)
+        except Exception:
+            pass
+        self._notice = f"{name} — quota used ({reason})"
+        try:
+            self.noticeChanged.emit(self._notice)
+            self.historyChanged.emit()
+        except Exception:
+            pass
+
     @Slot(str, str)
     @Slot(str, str, str)
     def selectStudent(self, name: str, pass_type: str, slot: str = "") -> None:
         self._resolve_block()
         self._update_roster_cache()
+        label = "Water" if pass_type == "Water" else "Bathroom"
         pt = PassType.Water if pass_type == "Water" else PassType.Bathroom
+        qc = check_quota(self.storage, self.cfg, name, label, self._block_id)
+        if not qc.get("allowed", True):
+            self._deny_notice(name, label, str(qc.get("reason", "")), slot or "")
+            return
         photo = self.camera.capture("out", student=name, block=self._block_id or "NoBlock")
         key = self.sm.select_student(name, pt, photo, slot or "")
         if key:
@@ -1659,11 +1792,38 @@ class Backend(QObject):
     def enqueue(self, name: str, pass_type: str, slot: str = "") -> None:
         self._resolve_block()
         self._update_roster_cache()
+        label = "Water" if pass_type == "Water" else "Bathroom"
         pt = PassType.Water if pass_type == "Water" else PassType.Bathroom
+        qc = check_quota(self.storage, self.cfg, name, label, self._block_id)
+        if not qc.get("allowed", True):
+            self._deny_notice(name, label, str(qc.get("reason", "")), slot or "")
+            return
         photo = self.camera.capture("out", student=name, block=self._block_id or "NoBlock")
         if self.sm.enqueue(name, pt, photo, slot or ""):
             self.queueChanged.emit()
             self.photosChanged.emit()
+
+    @Slot(str, str, result=bool)
+    def voidActivePass(self, key: str, password: str) -> bool:
+        try:
+            if not self.cfg.verify_password(password or ""):
+                self._set_pass_status("Wrong password — pass kept")
+                return False
+            rec = self.sm.void_pass((key or "").strip() or None)
+            if rec is None:
+                return False
+            prim = self.sm.active
+            self._elapsed = int(prim.elapsed_seconds) if prim else 0
+            self.stateChanged.emit(self.sm.state.value)
+            self.elapsedChanged.emit(self._elapsed)
+            self.queueChanged.emit()
+            self.historyChanged.emit()
+            self.photosChanged.emit()
+            self._set_pass_status(f"Voided {rec.student_name} (not counted)")
+            return True
+        except Exception as e:
+            self._set_pass_status(f"Void failed: {e}")
+            return False
 
     @Slot(str, result=bool)
     @Slot(str, str, result=bool)

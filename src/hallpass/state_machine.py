@@ -341,6 +341,58 @@ class PassStateMachine:
         self._sync()
         return record
 
+    def void_pass(self, key: str | None = None) -> PassRecord | None:
+        """Admin-confirmed void of an active pass (mistaken tap): logs CANCELLED
+        with actual duration, frees the place, advances that place's queue."""
+        if key:
+            leaving = self.actives.get(key)
+        else:
+            leaving = self.active
+        if not leaving:
+            return None
+        time_in = datetime.now()
+        duration_m = (time_in - leaving.time_out).total_seconds() / 60.0
+        record = PassRecord(
+            student_name=leaving.student_name,
+            block_id=leaving.block_id,
+            pass_type=leaving.pass_type,
+            time_out=leaving.time_out,
+            time_in=time_in,
+            duration_minutes=round(duration_m, 2),
+            overtime_status=OvertimeStatus.CANCELLED,
+            photo_out_path=leaving.photo_out_path,
+            photo_in_path="",
+            slot=leaving.slot or "",
+        )
+        self.storage.append_log(record)
+        freed = leaving.place_key
+        try:
+            del self.actives[freed]
+        except KeyError:
+            pass
+        nxt = None
+        if getattr(self.cfg, "pass_mode", "simple") == "slots":
+            dq = self.slot_queues.get(freed)
+            if dq:
+                nxt = dq.popleft()
+        else:
+            if self.queue:
+                nxt = self.queue.popleft()
+        if nxt is not None:
+            if self.cfg.tts_enabled and self.on_tts:
+                self.on_tts(f"Next up, {nxt.name}, you may go for {nxt.pass_type.value}.")
+            self.actives[freed] = ActivePass(
+                student_name=nxt.name,
+                block_id=self.current_block(),
+                pass_type=nxt.pass_type,
+                time_out=datetime.now(),
+                photo_out_path=nxt.photo_out_path or "",
+                slot=leaving.slot or "",
+                place_key=freed,
+            )
+        self._sync()
+        return record
+
     def set_next_photo(self, photo_out_path: str) -> None:
         prim = self.active
         if prim and not prim.photo_out_path:

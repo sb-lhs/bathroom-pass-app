@@ -78,6 +78,19 @@ def _ensure_db(conn: sqlite3.Connection) -> None:
             conn.execute("ALTER TABLE pass_logs ADD COLUMN slot TEXT NOT NULL DEFAULT ''")
     except Exception:
         pass
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS denied_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_name TEXT NOT NULL,
+            block_id TEXT NOT NULL,
+            pass_type TEXT NOT NULL,
+            slot TEXT NOT NULL DEFAULT '',
+            time TEXT NOT NULL,
+            reason TEXT NOT NULL
+        )
+        """
+    )
     conn.commit()
 
 
@@ -207,6 +220,59 @@ class Storage:
 
     def get_logs_by_block(self, block_id: str) -> list[PassRecord]:
         return [r for r in self.get_logs() if r.block_id == block_id]
+
+    def count_passes(self, student: str, day: str, pass_type: str | None = None, block: str | None = None) -> int:
+        """Count non-cancelled passes for a student on a YYYY-MM-DD day."""
+        name = str(student or "").strip().lower()
+        if not name:
+            return 0
+        with sqlite3.connect(self._db_path) as conn:
+            _ensure_db(conn)
+            q = "SELECT COUNT(*) FROM pass_logs WHERE lower(student_name) = ? AND substr(time_out, 1, 10) = ? AND overtime_status != 'CANCELLED'"
+            args: list = [name, day]
+            if pass_type:
+                q += " AND pass_type = ?"
+                args.append(pass_type)
+            if block:
+                q += " AND block_id = ?"
+                args.append(block)
+            try:
+                row = conn.execute(q, args).fetchone()
+                return int(row[0]) if row else 0
+            except Exception:
+                return 0
+
+    def log_denied(self, student: str, block_id: str, pass_type: str, slot: str, reason: str, when: datetime | None = None) -> None:
+        when = when or datetime.now()
+        with sqlite3.connect(self._db_path) as conn:
+            _ensure_db(conn)
+            conn.execute(
+                "INSERT INTO denied_logs (student_name, block_id, pass_type, slot, time, reason) VALUES (?,?,?,?,?,?)",
+                (str(student or ""), str(block_id or ""), str(pass_type or ""), str(slot or ""), when.strftime("%Y-%m-%d %H:%M:%S"), str(reason or "")),
+            )
+            conn.commit()
+
+    def get_denials(self, day: str | None = None, limit: int = 50) -> list[dict]:
+        with sqlite3.connect(self._db_path) as conn:
+            _ensure_db(conn)
+            if day:
+                rows = conn.execute(
+                    "SELECT student_name, block_id, pass_type, slot, time, reason FROM denied_logs WHERE substr(time, 1, 10) = ? ORDER BY id DESC LIMIT ?",
+                    (day, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT student_name, block_id, pass_type, slot, time, reason FROM denied_logs ORDER BY id DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+        out = []
+        for r in rows:
+            try:
+                t = datetime.strptime(r[4], "%Y-%m-%d %H:%M:%S").strftime("%H:%M")
+            except Exception:
+                t = str(r[4])
+            out.append({"student": r[0], "block": r[1], "passType": r[2], "slot": r[3] or "", "time": t, "reason": r[5]})
+        return out
 
     def ensure_dirs(self) -> None:
         data_dir().mkdir(parents=True, exist_ok=True)

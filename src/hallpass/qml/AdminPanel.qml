@@ -1785,7 +1785,109 @@ Dialog {
                                         }
                                     }
                                 }
-                                Label { text: backend.passStatus; color: (backend.passStatus.indexOf("Return all") >= 0 || backend.passStatus.indexOf("Keep at least") >= 0 || backend.passStatus.indexOf("in use") >= 0 || backend.passStatus.indexOf("Failed") >= 0 || backend.passStatus.indexOf("already exists") >= 0 || backend.passStatus.indexOf("taken or missing") >= 0 || backend.passStatus.indexOf("Max ") >= 0) ? "#991b1b" : "#14532d"; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true; visible: backend.passStatus !== "" }
+                                Label { text: backend.passStatus; color: (backend.passStatus.indexOf("Return all") >= 0 || backend.passStatus.indexOf("Keep at least") >= 0 || backend.passStatus.indexOf("in use") >= 0 || backend.passStatus.indexOf("Failed") >= 0 || backend.passStatus.indexOf("already exists") >= 0 || backend.passStatus.indexOf("taken or missing") >= 0 || backend.passStatus.indexOf("Max ") >= 0 || backend.passStatus.indexOf("Wrong password") >= 0) ? "#991b1b" : "#14532d"; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true; visible: backend.passStatus !== "" }
+                            }
+                        }
+                        Rectangle {
+                            Layout.columnSpan: 2
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: quotaCol.implicitHeight + 32
+                            radius: 4
+                            color: "#ffffff"
+                            border.color: "#7c3aed"
+                            border.width: 1
+                            ColumnLayout {
+                                id: quotaCol
+                                anchors.fill: parent
+                                anchors.margins: 16
+                                spacing: 10
+                                RowLayout {
+                                    spacing: 8
+                                    Layout.fillWidth: true
+                                    Rectangle { color: "#7c3aed"; radius: 4; Layout.preferredWidth: 4; Layout.preferredHeight: 16 }
+                                    Label { text: "Quotas — 0 means unlimited"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 13; Layout.fillWidth: true }
+                                }
+                                RowLayout {
+                                    spacing: 8
+                                    Layout.fillWidth: true
+                                    Label { text: "Daily Bathroom"; color: "#334155"; font.pixelSize: 12; Layout.preferredWidth: 110 }
+                                    Button { text: "−"; Layout.preferredWidth: 40; Layout.preferredHeight: 36; contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true } background: Rectangle { color: "#334155"; radius: 4 } onClicked: backend.setQuotas(backend.quotaDailyBathroom - 1, backend.quotaDailyWater, backend.quotaPerBlock) }
+                                    Rectangle { color: "#f1f5f9"; radius: 4; border.color: "#d1d5db"; border.width: 1; Layout.preferredWidth: 52; Layout.preferredHeight: 36; Label { anchors.centerIn: parent; text: backend.quotaDailyBathroom; color: "#1e3a5f"; font.pixelSize: 14; font.bold: true } }
+                                    Button { text: "+"; Layout.preferredWidth: 40; Layout.preferredHeight: 36; contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true } background: Rectangle { color: "#1e3a5f"; radius: 4 } onClicked: backend.setQuotas(backend.quotaDailyBathroom + 1, backend.quotaDailyWater, backend.quotaPerBlock) }
+                                    Item { Layout.fillWidth: true }
+                                    Label { text: "Daily Water"; color: "#334155"; font.pixelSize: 12; Layout.preferredWidth: 80 }
+                                    Button { text: "−"; Layout.preferredWidth: 40; Layout.preferredHeight: 36; contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true } background: Rectangle { color: "#334155"; radius: 4 } onClicked: backend.setQuotas(backend.quotaDailyBathroom, backend.quotaDailyWater - 1, backend.quotaPerBlock) }
+                                    Rectangle { color: "#f1f5f9"; radius: 4; border.color: "#d1d5db"; border.width: 1; Layout.preferredWidth: 52; Layout.preferredHeight: 36; Label { anchors.centerIn: parent; text: backend.quotaDailyWater; color: "#1e3a5f"; font.pixelSize: 14; font.bold: true } }
+                                    Button { text: "+"; Layout.preferredWidth: 40; Layout.preferredHeight: 36; contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true } background: Rectangle { color: "#1e3a5f"; radius: 4 } onClicked: backend.setQuotas(backend.quotaDailyBathroom, backend.quotaDailyWater + 1, backend.quotaPerBlock) }
+                                }
+                                RowLayout {
+                                    spacing: 8
+                                    Layout.fillWidth: true
+                                    Label { text: "Per block"; color: "#334155"; font.pixelSize: 12; Layout.preferredWidth: 110 }
+                                    Button { text: "−"; Layout.preferredWidth: 40; Layout.preferredHeight: 36; contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true } background: Rectangle { color: "#334155"; radius: 4 } onClicked: backend.setQuotas(backend.quotaDailyBathroom, backend.quotaDailyWater, backend.quotaPerBlock - 1) }
+                                    Rectangle { color: "#f1f5f9"; radius: 4; border.color: "#d1d5db"; border.width: 1; Layout.preferredWidth: 52; Layout.preferredHeight: 36; Label { anchors.centerIn: parent; text: backend.quotaPerBlock; color: "#1e3a5f"; font.pixelSize: 14; font.bold: true } }
+                                    Button { text: "+"; Layout.preferredWidth: 40; Layout.preferredHeight: 36; contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true } background: Rectangle { color: "#1e3a5f"; radius: 4 } onClicked: backend.setQuotas(backend.quotaDailyBathroom, backend.quotaDailyWater, backend.quotaPerBlock + 1) }
+                                    Item { Layout.fillWidth: true }
+                                }
+                                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#e2e8f0" }
+                                Label { text: "Per-student overrides (blank = global)"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
+                                RowLayout {
+                                    id: quotaRow
+                                    function saveStudentQuota() {
+                                        if (backend.setStudentQuota(qStudent.text, parseInt(qBath.text) || 0, parseInt(qWater.text) || 0, parseInt(qBlock.text) || 0)) { qStudent.text = ""; qBath.text = ""; qWater.text = ""; qBlock.text = "" }
+                                    }
+                                    spacing: 6
+                                    Layout.fillWidth: true
+                                    TextField { id: qStudent; placeholderText: "Student"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } onAccepted: quotaRow.saveStudentQuota() }
+                                    TextField { id: qBath; placeholderText: "B/day"; color: "#0f172a"; placeholderTextColor: "#64748b"; inputMethodHints: Qt.ImhDigitsOnly; Layout.preferredWidth: 64; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } onAccepted: quotaRow.saveStudentQuota() }
+                                    TextField { id: qWater; placeholderText: "W/day"; color: "#0f172a"; placeholderTextColor: "#64748b"; inputMethodHints: Qt.ImhDigitsOnly; Layout.preferredWidth: 64; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } onAccepted: quotaRow.saveStudentQuota() }
+                                    TextField { id: qBlock; placeholderText: "/block"; color: "#0f172a"; placeholderTextColor: "#64748b"; inputMethodHints: Qt.ImhDigitsOnly; Layout.preferredWidth: 64; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#475569"; border.width: 1; radius: 4 } onAccepted: quotaRow.saveStudentQuota() }
+                                    Button {
+                                        text: "Set"; Layout.preferredWidth: 60; Layout.preferredHeight: 36
+                                        contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                        background: Rectangle { color: "#1e3a5f"; radius: 4 }
+                                        onClicked: quotaRow.saveStudentQuota()
+                                    }
+                                }
+                                Repeater {
+                                    model: backend.quotaOverrides
+                                    delegate: RowLayout {
+                                        spacing: 8
+                                        Layout.fillWidth: true
+                                        property string qName: modelData.student
+                                        Label { text: modelData.student; color: "#1e293b"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+                                        Label { text: "B:" + modelData.daily_bathroom + " W:" + modelData.daily_water + " /blk:" + modelData.per_block; color: "#475569"; font.pixelSize: 11 }
+                                        Button {
+                                            text: "Grant +1"; Layout.preferredWidth: 80; Layout.preferredHeight: 32
+                                            contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 11 }
+                                            background: Rectangle { color: "#14532d"; radius: 4 }
+                                            onClicked: backend.grantQuotaOverride(qName)
+                                        }
+                                        Button {
+                                            text: "X"; Layout.preferredWidth: 36; Layout.preferredHeight: 32
+                                            contentItem: Text { text: parent.text; color: "#991b1b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 11 }
+                                            background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#991b1b" }
+                                            onClicked: backend.clearStudentQuota(qName)
+                                        }
+                                    }
+                                }
+                                RowLayout {
+                                    spacing: 8
+                                    Layout.fillWidth: true
+                                    TextField { id: qGrantName; placeholderText: "Grant one extra pass to…"; color: "#0f172a"; placeholderTextColor: "#64748b"; selectionColor: "#3b82f6"; selectedTextColor: "white"; Layout.fillWidth: true; Layout.preferredHeight: 36; font.pixelSize: 12; background: Rectangle { color: "#ffffff"; border.color: "#14532d"; border.width: 1; radius: 4 } onAccepted: if (backend.grantQuotaOverride(qGrantName.text)) qGrantName.text = "" }
+                                    Button {
+                                        text: "Grant +1"; Layout.preferredWidth: 90; Layout.preferredHeight: 36
+                                        contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                        background: Rectangle { color: "#14532d"; radius: 4 }
+                                        onClicked: if (backend.grantQuotaOverride(qGrantName.text)) qGrantName.text = ""
+                                    }
+                                }
+                                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#e2e8f0" }
+                                Label { text: backend.denialsToday.length > 0 ? ("Denied today (" + backend.denialsToday.length + ")") : "No denials today"; color: "#475569"; font.pixelSize: 11; font.italic: true; Layout.fillWidth: true }
+                                Repeater {
+                                    model: backend.denialsToday
+                                    delegate: Label { text: modelData.time + " — " + modelData.student + " (" + modelData.passType + "): " + modelData.reason; color: "#92400e"; font.pixelSize: 11; Layout.fillWidth: true; elide: Text.ElideRight }
+                                }
                             }
                         }
                         Rectangle {

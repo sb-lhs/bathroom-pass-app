@@ -104,6 +104,11 @@ def db_path() -> Path:
     return data_dir() / "logs.db"
 
 
+def replace_config(cfg: "AppConfig", **kw: Any) -> "AppConfig":
+    import dataclasses
+    return dataclasses.replace(cfg, **kw)
+
+
 @dataclass(frozen=True)
 class AppConfig:
     bathroom_threshold_seconds: int = DEFAULT_BATHROOM_THRESHOLD
@@ -122,41 +127,11 @@ class AppConfig:
     pass_mode: str = "simple"
     max_concurrent: int = 1
     pass_slots: list[str] = field(default_factory=list)
+    quota_daily_bathroom: int = 0
+    quota_daily_water: int = 0
+    quota_per_block: int = 0
+    quota_overrides: dict[str, dict[str, int]] = field(default_factory=dict)
 
-
-PASS_MODES = ("simple", "headcount", "slots")
-MAX_SLOTS = 6
-
-
-def norm_pass_mode(v: Any) -> str:
-    s = str(v or "").strip().lower()
-    return s if s in PASS_MODES else "headcount"
-
-
-def norm_max_concurrent(v: Any) -> int:
-    try:
-        n = int(v)
-    except Exception:
-        return 1
-    return max(1, min(8, n))
-
-
-def norm_pass_slots(v: Any) -> list[str]:
-    if not isinstance(v, list):
-        return []
-    out: list[str] = []
-    for x in v:
-        s = str(x or "").strip()
-        if s and s not in out:
-            out.append(s)
-        if len(out) >= MAX_SLOTS:
-            break
-    return out
-
-
-def replace_config(cfg: AppConfig, **kw: Any) -> AppConfig:
-    import dataclasses
-    return dataclasses.replace(cfg, **kw)
 
     @staticmethod
     def hash_password(password: str, salt: str | None = None) -> tuple[str, str]:
@@ -197,6 +172,63 @@ def replace_config(cfg: AppConfig, **kw: Any) -> AppConfig:
         hashed, salt = self.hash_password(new_password)
         return replace_config(self, admin_password_hash=hashed, salt=salt, first_run=False)
 
+PASS_MODES = ("simple", "headcount", "slots")
+MAX_SLOTS = 6
+
+
+def norm_pass_mode(v: Any) -> str:
+    s = str(v or "").strip().lower()
+    return s if s in PASS_MODES else "headcount"
+
+
+def norm_max_concurrent(v: Any) -> int:
+    try:
+        n = int(v)
+    except Exception:
+        return 1
+    return max(1, min(8, n))
+
+
+def norm_quota_count(v: Any) -> int:
+    try:
+        n = int(v)
+    except Exception:
+        return 0
+    return max(0, min(99, n))
+
+
+def norm_quota_overrides(v: Any) -> dict[str, dict[str, int]]:
+    if not isinstance(v, dict):
+        return {}
+    out: dict[str, dict[str, int]] = {}
+    for k, o in v.items():
+        name = str(k or "").strip()
+        if not name or not isinstance(o, dict):
+            continue
+        entry = {
+            "daily_bathroom": norm_quota_count(o.get("daily_bathroom", 0)),
+            "daily_water": norm_quota_count(o.get("daily_water", 0)),
+            "per_block": norm_quota_count(o.get("per_block", 0)),
+        }
+        if any(entry.values()):
+            out[name] = entry
+    return out
+
+
+def norm_pass_slots(v: Any) -> list[str]:
+    if not isinstance(v, list):
+        return []
+    out: list[str] = []
+    for x in v:
+        s = str(x or "").strip()
+        if s and s not in out:
+            out.append(s)
+        if len(out) >= MAX_SLOTS:
+            break
+    return out
+
+
+
 
 def _ensure_config_exists() -> Path:
     """Ensure config.json exists at runtime — copy from default template if missing."""
@@ -236,6 +268,10 @@ def _ensure_config_exists() -> Path:
         "pass_mode": "simple",
         "max_concurrent": 1,
         "pass_slots": [],
+        "quota_daily_bathroom": 0,
+        "quota_daily_water": 0,
+        "quota_per_block": 0,
+        "quota_overrides": {},
     }
     p.write_text(json.dumps(fallback, indent=2), encoding="utf-8")
     return p
@@ -262,6 +298,10 @@ def _parse_raw_config(raw: dict[str, Any]) -> AppConfig:
         pass_mode=norm_pass_mode(raw.get("pass_mode", "simple")),
         max_concurrent=norm_max_concurrent(raw.get("max_concurrent", 1)),
         pass_slots=norm_pass_slots(raw.get("pass_slots", [])),
+        quota_daily_bathroom=norm_quota_count(raw.get("quota_daily_bathroom", 0)),
+        quota_daily_water=norm_quota_count(raw.get("quota_daily_water", 0)),
+        quota_per_block=norm_quota_count(raw.get("quota_per_block", 0)),
+        quota_overrides=norm_quota_overrides(raw.get("quota_overrides", {})),
     )
 
 
