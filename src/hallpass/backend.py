@@ -35,6 +35,7 @@ from .rosters import (
 )
 from .quotas import check_quota, grant_override, limits_for
 from .schedules import active_block, active_blocks, flip_weekday_letters, format_12h, get_blocks, get_custom_days, get_date_overrides, get_templates, import_date_overrides_csv, import_date_overrides_ics, load_schedules, parse_time_input, save_schedules, set_custom_day, set_date_overrides, set_templates, resolve_today_letter, list_school_presets, apply_school_preset, apply_school_preset_weekdays, export_school_preset, import_school_preset_file, fetch_remote_preset_index, fetch_and_install_remote_preset
+from .updater import UpdateResult, fetch_latest_tag, installed_version, is_newer, perform_update
 from .state_machine import PassStateMachine, PassType, State
 from .storage import Storage
 
@@ -59,6 +60,7 @@ class Backend(QObject):
     remotePresetsChanged = Signal()
     passStatusChanged = Signal(str)
     noticeChanged = Signal(str)
+    updateStatusChanged = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -97,6 +99,13 @@ class Backend(QObject):
         self._pass_status = ""
         self._notice = ""
         self._remote_presets: list = []
+        self._update_available: bool = False
+        self._update_version: str = ""
+        self._update_status: str = ""
+        self._update_timer = QTimer(self)
+        self._update_timer.setInterval(6 * 60 * 60 * 1000)  # 6 hours
+        self._update_timer.timeout.connect(self._auto_check_updates)
+        self._update_timer.start()
         QTimer.singleShot(1000, self._deferred_startup)
         # Daily timer for weekly autodelete
         self._photos_timer = QTimer(self)
@@ -247,6 +256,22 @@ class Backend(QObject):
     def passStatus(self) -> str:
         return getattr(self, "_pass_status", "")
 
+    @Property(bool, notify=configChanged)  # type: ignore
+    def autoUpdateEnabled(self) -> bool:
+        return bool(getattr(self.cfg, "auto_update_enabled", False))
+
+    @Property(bool, notify=updateStatusChanged)  # type: ignore
+    def updateAvailable(self) -> bool:
+        return bool(getattr(self, "_update_available", False))
+
+    @Property(str, notify=updateStatusChanged)  # type: ignore
+    def updateVersion(self) -> str:
+        return str(getattr(self, "_update_version", ""))
+
+    @Property(str, notify=updateStatusChanged)  # type: ignore
+    def updateStatus(self) -> str:
+        return getattr(self, "_update_status", "")
+
     @Property(str, notify=noticeChanged)  # type: ignore
     def kioskNotice(self) -> str:
         return getattr(self, "_notice", "")
@@ -359,6 +384,89 @@ class Backend(QObject):
         except Exception as e:
             self._set_pass_status(f"Failed: {e}")
             return False
+
+    @Slot(bool, result=bool)
+    def setAutoUpdate(self, enabled: bool) -> bool:
+        try:
+            self.cfg = replace_config(self.cfg, auto_update_enabled=bool(enabled))
+            save_config(self.cfg)
+            self.configChanged.emit()
+            self._set_pass_status("Auto-updates " + ("on" if enabled else "off"))
+            return True
+        except Exception as e:
+            self._set_pass_status(f"Failed: {e}")
+            return False
+
+    def _auto_check_updates(self) -> None:
+        if not self.autoUpdateEnabled:
+            return
+        self._run_bg(self._check_work)
+
+    def _check_work(self) -> None:
+        try:
+            remote = fetch_latest_tag()
+            if remote is None:
+                self._update_status = "Update check — could not reach GitHub"
+                try:
+                    self.updateStatusChanged.emit()
+                except Exception:
+                    pass
+                return
+            local = installed_version()
+            newer = is_newer(remote, local)
+            self._update_available = newer
+            self._update_version = remote if newer else local
+            self._update_status = (
+                f"Update available: {remote}" if newer else f"Up to date ({local})"
+            )
+            try:
+                self.updateStatusChanged.emit()
+            except Exception:
+                pass
+        except Exception as e:
+            self._update_status = f"Update check failed: {e}"
+            try:
+                self.updateStatusChanged.emit()
+            except Exception:
+                pass
+
+    @Slot(result=bool)
+    def checkForUpdates(self) -> bool:
+        self._run_bg(self._check_work)
+        return True
+
+    @Slot(result=bool)
+    def installUpdate(self) -> bool:
+        def work() -> None:
+            try:
+                self._update_status = "Preparing update…"
+                try:
+                    self.updateStatusChanged.emit()
+                except Exception:
+                    pass
+                res = perform_update()
+                if res.ok:
+                    self._update_available = False
+                    self._update_version = res.version or installed_version()
+                    self._update_status = f"Updated to {res.version or installed_version()} — relaunch hallpass-qt"
+                    try:
+                        self.updateStatusChanged.emit()
+                    except Exception:
+                        pass
+                else:
+                    self._update_status = f"Update failed: {res.message}"
+                    try:
+                        self.updateStatusChanged.emit()
+                    except Exception:
+                        pass
+            except Exception as e:
+                self._update_status = f"Update failed: {e}"
+                try:
+                    self.updateStatusChanged.emit()
+                except Exception:
+                    pass
+        self._run_bg(work)
+        return True
 
     @Property(str, notify=stateChanged)  # type: ignore
     def stateMode(self) -> str:

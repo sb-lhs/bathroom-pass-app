@@ -1968,6 +1968,67 @@ Dialog {
                             }
                         }
                         Rectangle {
+                            Layout.columnSpan: 2
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: updateCol.implicitHeight + 32
+                            radius: 4
+                            color: "#ffffff"
+                            border.color: "#7c3aed"
+                            border.width: 1
+                            ColumnLayout {
+                                id: updateCol
+                                anchors.fill: parent
+                                anchors.margins: 16
+                                spacing: 10
+                                RowLayout {
+                                    spacing: 8
+                                    Layout.fillWidth: true
+                                    Rectangle { color: "#7c3aed"; radius: 4; Layout.preferredWidth: 4; Layout.preferredHeight: 16 }
+                                    Label { text: "Automatic Updates"; color: "#1e3a5f"; font.bold: true; font.pixelSize: 13; Layout.fillWidth: true }
+                                    Switch {
+                                        id: autoUpdateSwitch
+                                        Binding on checked { value: backend ? backend.autoUpdateEnabled : false }
+                                        onToggled: backend.setAutoUpdate(checked)
+                                    }
+                                }
+                                RowLayout {
+                                    spacing: 8
+                                    Layout.fillWidth: true
+                                    Label { text: "Installed"; color: "#334155"; font.pixelSize: 12; Layout.preferredWidth: 80 }
+                                    Label { text: backend ? backend.updateVersion : "—"; color: "#1e293b"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+                                    Button {
+                                        text: "Check Now"; Layout.preferredWidth: 90; Layout.preferredHeight: 36
+                                        contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                        background: Rectangle { color: "#334155"; radius: 4 }
+                                        onClicked: backend.checkForUpdates()
+                                    }
+                                }
+                                RowLayout {
+                                    spacing: 8
+                                    Layout.fillWidth: true
+                                    Label { text: "Latest"; color: "#334155"; font.pixelSize: 12; Layout.preferredWidth: 80 }
+                                    Label { text: backend.updateAvailable ? ("→ " + backend.updateVersion) : "— up to date"; color: backend.updateAvailable ? "#14532d" : "#14532d"; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+                                    Button {
+                                        text: backend.updateAvailable ? "Install & Relaunch" : "Up to date"
+                                        Layout.preferredWidth: 150; Layout.preferredHeight: 36
+                                        enabled: backend.updateAvailable
+                                        contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true; font.pixelSize: 12 }
+                                        background: Rectangle { color: backend.updateAvailable ? "#1e3a5f" : "#e5e7eb"; radius: 4 }
+                                        onClicked: backend.installUpdate()
+                                    }
+                                }
+                                Label {
+                                    text: backend ? backend.updateStatus : ""
+                                    color: backend.updateStatus.indexOf("failed")>=0 || backend.updateStatus.indexOf("Failed")>=0 ? "#991b1b" : "#14532d"
+                                    font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true; visible: backend.updateStatus !== ""
+                                }
+                                Label {
+                                    text: "Builds the latest GitHub tag into a .deb and installs with apt (needs sudo). Existing config, rosters and logs are kept."
+                                    color: "#64748b"; font.pixelSize: 10; font.italic: true; wrapMode: Text.WordWrap; Layout.fillWidth: true
+                                }
+                            }
+                        }
+                        Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 160
                             radius: 4

@@ -16,5 +16,6 @@
   "quota_daily_bathroom": 0,
   "quota_daily_water": 0,
   "quota_per_block": 0,
-  "quota_overrides": {}
+  "quota_overrides": {},
+  "auto_update_enabled": false
 }
