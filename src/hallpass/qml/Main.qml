@@ -129,6 +129,14 @@ ApplicationWindow {
                 padding: 10
                 onClicked: { adminDialog.mode="admin"; adminDialog.open() }
             }
+            Button {
+                text: "Override"
+                font.pixelSize: 14
+                padding: 8
+                background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#1e3a5f"; border.width: 1 }
+                contentItem: Text { text: parent.text; color: "#1e3a5f"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                onClicked: { overrideName.text = ""; overridePass.text = ""; overrideError.text = ""; overrideDialog.open() }
+            }
         }
     }
 
@@ -795,6 +803,106 @@ ApplicationWindow {
                 voidError.text = "Wrong password — pass kept"
                 voidPass.text = ""
                 voidPass.forceActiveFocus()
+            }
+        }
+    }
+
+    // Manual override dialog — admin password required, bypasses quota
+    Dialog {
+        id: overrideDialog
+        title: "Manual Override — Add Student"
+        modal: true
+        anchors.centerIn: parent
+        width: 440
+        height: 420
+        standardButtons: Dialog.NoButton
+        background: Rectangle { color: "#ffffff"; radius: 8; border.color: "#1e3a5f"; border.width: 2 }
+        property string overridePassType: "Bathroom"
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 16
+            spacing: 12
+            Label { text: "Manual Override"; color: "#1e293b"; font.bold: true; font.pixelSize: 18; Layout.fillWidth: true }
+            Label { text: "Teacher password required. Quota limits are bypassed."; color: "#475569"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            TextField {
+                id: overrideName
+                placeholderText: "Student name"
+                font.pixelSize: 18
+                Layout.fillWidth: true
+                Layout.preferredHeight: 48
+                color: "#1e293b"
+                placeholderTextColor: "#64748b"
+                background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
+            }
+            RowLayout {
+                spacing: 8
+                Layout.fillWidth: true
+                Label { text: "Pass type"; color: "#1e293b"; font.pixelSize: 12; font.bold: true }
+                Button {
+                    text: "Bathroom"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 40
+                    checkable: true
+                    checked: overrideDialog.overridePassType === "Bathroom"
+                    background: Rectangle { color: overrideDialog.overridePassType === "Bathroom" ? "#1e3a5f" : "#ffffff"; radius: 4; border.color: overrideDialog.overridePassType === "Bathroom" ? "#1e3a5f" : "#d1d5db" }
+                    contentItem: Text { text: parent.text; color: overrideDialog.overridePassType === "Bathroom" ? "white" : "#1e293b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                    onClicked: overrideDialog.overridePassType = "Bathroom"
+                }
+                Button {
+                    text: "Water"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 40
+                    checkable: true
+                    checked: overrideDialog.overridePassType === "Water"
+                    background: Rectangle { color: overrideDialog.overridePassType === "Water" ? "#14532d" : "#ffffff"; radius: 4; border.color: overrideDialog.overridePassType === "Water" ? "#14532d" : "#d1d5db" }
+                    contentItem: Text { text: parent.text; color: overrideDialog.overridePassType === "Water" ? "white" : "#1e293b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                    onClicked: overrideDialog.overridePassType = "Water"
+                }
+            }
+            TextField {
+                id: overridePass
+                echoMode: TextInput.Password
+                placeholderText: "Teacher password"
+                font.pixelSize: 18
+                Layout.fillWidth: true
+                Layout.preferredHeight: 48
+                color: "#1e293b"
+                placeholderTextColor: "#64748b"
+                background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
+                onAccepted: overrideDialog.tryOverride()
+            }
+            Label { id: overrideError; text: ""; color: "#991b1b"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true; visible: text !== "" }
+            RowLayout {
+                spacing: 12
+                Layout.fillWidth: true
+                Button {
+                    text: "Cancel"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 48
+                    background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#d1d5db"; border.width: 1 }
+                    contentItem: Text { text: parent.text; color: "#1e293b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                    onClicked: overrideDialog.close()
+                }
+                Button {
+                    text: "Override"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 48
+                    background: Rectangle { color: "#1e3a5f"; radius: 4 }
+                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                    onClicked: overrideDialog.tryOverride()
+                }
+            }
+        }
+        function tryOverride() {
+            if (backend.overridePass(overrideName.text, overridePassType, "", overridePass.text)) {
+                overrideName.text = ""
+                overridePass.text = ""
+                overrideError.text = ""
+                overrideDialog.close()
+            } else {
+                overrideError.text = "Override failed — check password"
+                overridePass.text = ""
+                overridePass.forceActiveFocus()
             }
         }
     }

@@ -1911,6 +1911,44 @@ class Backend(QObject):
             self.queueChanged.emit()
             self.photosChanged.emit()
 
+    @Slot(str, str, str, str, result=bool)
+    def overridePass(self, name: str, pass_type: str, slot: str, password: str) -> bool:
+        """Admin-confirmed manual override: bypasses quota, adds student to pass or queue."""
+        try:
+            if not self.cfg.verify_password(password or ""):
+                self._set_pass_status("Wrong password — override rejected")
+                return False
+            name = (name or "").strip()
+            if not name:
+                self._set_pass_status("Student name required")
+                return False
+            self._resolve_block()
+            self._update_roster_cache()
+            label = "Water" if pass_type == "Water" else "Bathroom"
+            pt = PassType.Water if pass_type == "Water" else PassType.Bathroom
+            photo = self.camera.capture("out", student=name, block=self._block_id or "NoBlock")
+            key = self.sm.select_student(name, pt, photo, slot or "")
+            if key:
+                self._set_pass_status(f"Override: {name} added to {label} pass")
+            else:
+                # No free place — fall back to queue
+                if self.sm.enqueue(name, pt, photo, slot or ""):
+                    self._set_pass_status(f"Override: {name} queued for {label}")
+                else:
+                    self._set_pass_status("Override failed — no free place and queue full")
+                    return False
+            prim = self.sm.active
+            self._elapsed = int(prim.elapsed_seconds) if prim else 0
+            self.stateChanged.emit(self.sm.state.value)
+            self.elapsedChanged.emit(self._elapsed)
+            self.queueChanged.emit()
+            self.historyChanged.emit()
+            self.photosChanged.emit()
+            return True
+        except Exception as e:
+            self._set_pass_status(f"Override failed: {e}")
+            return False
+
     @Slot(str, str, result=bool)
     def voidActivePass(self, key: str, password: str) -> bool:
         try:
