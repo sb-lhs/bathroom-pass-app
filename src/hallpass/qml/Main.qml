@@ -576,6 +576,14 @@ ApplicationWindow {
                                 font.italic: true
                             }
                             Button {
+                                text: "✓"
+                                Layout.preferredWidth: 52
+                                Layout.preferredHeight: 52
+                                background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#bbf7d0"; border.width: 1 }
+                                contentItem: Text { text: parent.text; color: "#14532d"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 26; font.bold: true }
+                                onClicked: backend.approveQueued(modelData.name, modelData.slot || "")
+                            }
+                            Button {
                                 text: "✕"
                                 Layout.preferredWidth: 52
                                 Layout.preferredHeight: 52
@@ -633,6 +641,14 @@ ApplicationWindow {
                                                 elide: Text.ElideRight
                                             }
                                             Label { text: modelData.passType; color: "#334155"; font.family: "Source Sans Pro"; font.pixelSize: 16; font.italic: true }
+                                            Button {
+                                                text: "✓"
+                                                Layout.preferredWidth: 44
+                                                Layout.preferredHeight: 44
+                                                background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#bbf7d0"; border.width: 1 }
+                                                contentItem: Text { text: parent.text; color: "#14532d"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 22; font.bold: true }
+                                                onClicked: backend.approveQueued(modelData.name, qSlot)
+                                            }
                                             Button {
                                                 text: "✕"
                                                 Layout.preferredWidth: 44

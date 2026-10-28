@@ -1984,6 +1984,46 @@ class Backend(QObject):
         except Exception:
             return False
 
+    @Slot(str, str, result=bool)
+    @Slot(str, str, str, result=bool)
+    def approveQueued(self, name: str, slot: str = "", password: str = "") -> bool:
+        """Manually pull a queued student into an active pass. Optional password gate."""
+        try:
+            if password:
+                if not self.cfg.verify_password(password or ""):
+                    self._set_pass_status("Wrong password — approval rejected")
+                    return False
+            name = (name or "").strip()
+            if not name:
+                self._set_pass_status("Student name required")
+                return False
+            self._resolve_block()
+            self._update_roster_cache()
+            queued = self.sm.approve_queued(name, slot or "")
+            if queued is None:
+                self._set_pass_status(f"{name} not in queue")
+                return False
+            label = "Water" if queued.pass_type == PassType.Water else "Bathroom"
+            pt = queued.pass_type
+            photo = self.camera.capture("out", student=queued.name, block=self._block_id or "NoBlock")
+            key = self.sm.select_student(queued.name, pt, photo, queued.slot or slot or "")
+            if key:
+                self._set_pass_status(f"Approved: {queued.name} → {label} pass")
+            else:
+                # No free slot — re-queue them so nothing is lost
+                self.sm.enqueue(queued.name, pt, photo, queued.slot or slot or "")
+                self._set_pass_status(f"Approved: {queued.name} queued (no free slot)")
+            prim = self.sm.active
+            self._elapsed = int(prim.elapsed_seconds) if prim else 0
+            self.stateChanged.emit(self.sm.state.value)
+            self.elapsedChanged.emit(self._elapsed)
+            self.queueChanged.emit()
+            self.photosChanged.emit()
+            return True
+        except Exception as e:
+            self._set_pass_status(f"Approve failed: {e}")
+            return False
+
     @Slot()
     @Slot(str)
     def returnPass(self, key: str = "") -> None:

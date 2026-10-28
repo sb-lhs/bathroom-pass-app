@@ -230,6 +230,20 @@ class PassStateMachine:
             del self.slot_queues[sk][i]
         return True
 
+    def approve_queued(self, name: str, slot: str = "") -> QueuedStudent | None:
+        """Remove a queued student without logging, returning them for re-issue as an active pass."""
+        found = self._find_queued(name, slot or "")
+        if not found:
+            return None
+        sk, i = found
+        if sk == "shared":
+            approved = self.queue[i]
+            del self.queue[i]
+        else:
+            approved = self.slot_queues[sk][i]
+            del self.slot_queues[sk][i]
+        return approved
+
     def cancel_queued(self, name: str, slot: str = "") -> bool:
         found = self._find_queued(name, slot or "")
         if not found:

@@ -138,3 +138,21 @@ def test_water_vs_bathroom_threshold():
         sm.select_student("B", PassType.Bathroom, "/tmp/out2.jpg")
         sm.tick(190)
         assert sm.state == State.ACTIVE  # bathroom not overtime at 190
+
+
+def test_approve_queued():
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        sm = _machine(tmp, pass_mode="headcount", max_concurrent=1)
+        sm.select_student("Amy", PassType.Bathroom, "")
+        sm.enqueue("Zoe", PassType.Water)
+        assert len(sm.queue) == 1
+        # Approve removes from queue (backend re-enqueues if no free slot)
+        approved = sm.approve_queued("Zoe")
+        assert approved is not None and approved.name == "Zoe"
+        assert len(sm.queue) == 0
+        # Free the slot and manually add Zoe back (simulating backend re-enqueue)
+        sm.return_pass("")
+        # Slot freed, Amy returned — Zoe not auto-added by approve (backend handles re-enqueue)
+        # Verify approve on non-existent returns None
+        assert sm.approve_queued("NonExistent") is None
