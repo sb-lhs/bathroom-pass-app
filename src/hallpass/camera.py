@@ -212,14 +212,14 @@ class SilentCamera:
         s_clean = clean(student)
         b_clean = clean(block)
         if s_clean != "Unknown" or b_clean != "Unknown":
-            fname = f"{datestr}_{s_clean}_{b_clean}_{suffix}.jpg"
+            base = f"{datestr}_{s_clean}_{b_clean}_{suffix}"
         else:
-            fname = f"{datestr}_{suffix}.jpg"
-        p = photos_dir() / fname
+            base = f"{datestr}_{suffix}"
+        p = photos_dir() / f"{base}.jpg"
         counter = 0
         while p.exists():
             counter += 1
-            p = photos_dir() / f"{ts}_{suffix}_{counter}.jpg"
+            p = photos_dir() / f"{base}_{counter}.jpg"
         try:
             photos_dir().mkdir(parents=True, exist_ok=True)
         except Exception:
