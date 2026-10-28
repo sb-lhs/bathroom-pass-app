@@ -120,8 +120,14 @@ class SilentCamera:
                 # Low resolution for fast <100ms capture as per tip
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                # One warm read to trigger uvcvideo / permission and fill buffer
-                cap.read()
+                # Minimize internal buffer so reads return fresh frames, not stale ones
+                try:
+                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                except Exception:
+                    pass
+                # Flush a few frames to clear any stale buffer, then one warm read
+                for _ in range(5):
+                    cap.read()
                 self._cv_cap = cap
                 self._warm = True
             else:
@@ -133,7 +139,12 @@ class SilentCamera:
                 if cap2 and cap2.isOpened():
                     cap2.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                     cap2.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                    cap2.read()
+                    try:
+                        cap2.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                    except Exception:
+                        pass
+                    for _ in range(5):
+                        cap2.read()
                     self._cv_cap = cap2
                     self._warm = True
                 elif cap2:
@@ -149,6 +160,9 @@ class SilentCamera:
             cap = self._cv_cap
             # Use kept-open stream first (instant)
             if cap is not None and cap.isOpened():
+                # Flush stale frames from the internal buffer before capturing
+                for _ in range(5):
+                    cap.read()
                 ret, frame = cap.read()
                 if ret and frame is not None and getattr(frame, "size", 0) > 0:
                     cv2.imwrite(str(target), frame)
@@ -165,6 +179,13 @@ class SilentCamera:
             if fresh and fresh.isOpened():
                 fresh.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                 fresh.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                try:
+                    fresh.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                except Exception:
+                    pass
+                # Flush stale frames before capturing
+                for _ in range(5):
+                    fresh.read()
                 ret, frame = fresh.read()
                 fresh.release()
                 if ret and frame is not None and getattr(frame, "size", 0) > 0:
@@ -176,7 +197,12 @@ class SilentCamera:
                             if nc and nc.isOpened():
                                 nc.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                                 nc.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                                nc.read()
+                                try:
+                                    nc.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                                except Exception:
+                                    pass
+                                for _ in range(5):
+                                    nc.read()
                                 if self._cv_cap:
                                     try:
                                         self._cv_cap.release()
