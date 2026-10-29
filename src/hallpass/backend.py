@@ -1984,15 +1984,13 @@ class Backend(QObject):
         except Exception:
             return False
 
-    @Slot(str, str, result=bool)
     @Slot(str, str, str, result=bool)
-    def approveQueued(self, name: str, slot: str = "", password: str = "") -> bool:
-        """Manually pull a queued student into an active pass. Optional password gate."""
+    def approveQueued(self, name: str, slot: str, password: str) -> bool:
+        """Manually pull a queued student into an active pass. Admin password required."""
         try:
-            if password:
-                if not self.cfg.verify_password(password or ""):
-                    self._set_pass_status("Wrong password — approval rejected")
-                    return False
+            if not self.cfg.verify_password(password or ""):
+                self._set_pass_status("Wrong password — approval rejected")
+                return False
             name = (name or "").strip()
             if not name:
                 self._set_pass_status("Student name required")

@@ -28,6 +28,8 @@ ApplicationWindow {
     property var queuesBySlot: backend ? backend.queuesBySlot : ({})
     property string kioskNotice: backend ? backend.kioskNotice : ""
     property string voidKey: ""
+    property string approveName: ""
+    property string approveSlot: ""
     Timer {
         id: noticeTimer
         interval: 5000
@@ -581,7 +583,7 @@ ApplicationWindow {
                                 Layout.preferredHeight: 52
                                 background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#bbf7d0"; border.width: 1 }
                                 contentItem: Text { text: parent.text; color: "#14532d"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 26; font.bold: true }
-                                onClicked: backend.approveQueued(modelData.name, modelData.slot || "")
+                                onClicked: { root.approveName = modelData.name; root.approveSlot = modelData.slot || ""; approvePass.text = ""; approveError.text = ""; approveDialog.open() }
                             }
                             Button {
                                 text: "✕"
@@ -647,7 +649,7 @@ ApplicationWindow {
                                                 Layout.preferredHeight: 44
                                                 background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#bbf7d0"; border.width: 1 }
                                                 contentItem: Text { text: parent.text; color: "#14532d"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 22; font.bold: true }
-                                                onClicked: backend.approveQueued(modelData.name, qSlot)
+                                                onClicked: { root.approveName = modelData.name; root.approveSlot = qSlot; approvePass.text = ""; approveError.text = ""; approveDialog.open() }
                                             }
                                             Button {
                                                 text: "✕"
@@ -919,6 +921,71 @@ ApplicationWindow {
                 overrideError.text = "Override failed — check password"
                 overridePass.text = ""
                 overridePass.forceActiveFocus()
+            }
+        }
+    }
+
+    // Manual approve dialog — admin password required
+    Dialog {
+        id: approveDialog
+        title: "Approve Queued Student"
+        modal: true
+        anchors.centerIn: parent
+        width: 420
+        height: 280
+        standardButtons: Dialog.NoButton
+        background: Rectangle { color: "#ffffff"; radius: 8; border.color: "#14532d"; border.width: 2 }
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 16
+            spacing: 12
+            Label { text: "Approve " + root.approveName + "?"; color: "#1e293b"; font.bold: true; font.pixelSize: 18; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Label { text: "Teacher password required. Pulls them from the queue into an active pass."; color: "#475569"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            TextField {
+                id: approvePass
+                echoMode: TextInput.Password
+                placeholderText: "Teacher password"
+                font.pixelSize: 18
+                Layout.fillWidth: true
+                Layout.preferredHeight: 48
+                color: "#1e293b"
+                placeholderTextColor: "#64748b"
+                background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
+                onAccepted: approveDialog.tryApprove()
+            }
+            Label { id: approveError; text: ""; color: "#991b1b"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true; visible: text !== "" }
+            RowLayout {
+                spacing: 12
+                Layout.fillWidth: true
+                Button {
+                    text: "Cancel"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 48
+                    background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#d1d5db"; border.width: 1 }
+                    contentItem: Text { text: parent.text; color: "#1e293b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                    onClicked: approveDialog.close()
+                }
+                Button {
+                    text: "Approve"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 48
+                    background: Rectangle { color: "#14532d"; radius: 4 }
+                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                    onClicked: approveDialog.tryApprove()
+                }
+            }
+        }
+        function tryApprove() {
+            if (backend.approveQueued(root.approveName, root.approveSlot, approvePass.text)) {
+                approvePass.text = ""
+                root.approveName = ""
+                root.approveSlot = ""
+                approveError.text = ""
+                approveDialog.close()
+            } else {
+                approveError.text = "Wrong password — approval rejected"
+                approvePass.text = ""
+                approvePass.forceActiveFocus()
             }
         }
     }

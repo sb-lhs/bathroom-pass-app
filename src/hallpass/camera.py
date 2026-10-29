@@ -126,7 +126,7 @@ class SilentCamera:
                 except Exception:
                     pass
                 # Flush a few frames to clear any stale buffer, then one warm read
-                for _ in range(5):
+                for _ in range(2):
                     cap.read()
                 self._cv_cap = cap
                 self._warm = True
@@ -143,7 +143,7 @@ class SilentCamera:
                         cap2.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                     except Exception:
                         pass
-                    for _ in range(5):
+                    for _ in range(2):
                         cap2.read()
                     self._cv_cap = cap2
                     self._warm = True
@@ -161,7 +161,7 @@ class SilentCamera:
             # Use kept-open stream first (instant)
             if cap is not None and cap.isOpened():
                 # Flush stale frames from the internal buffer before capturing
-                for _ in range(5):
+                for _ in range(2):
                     cap.read()
                 ret, frame = cap.read()
                 if ret and frame is not None and getattr(frame, "size", 0) > 0:
@@ -184,7 +184,7 @@ class SilentCamera:
                 except Exception:
                     pass
                 # Flush stale frames before capturing
-                for _ in range(5):
+                for _ in range(2):
                     fresh.read()
                 ret, frame = fresh.read()
                 fresh.release()
@@ -201,7 +201,7 @@ class SilentCamera:
                                     nc.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                                 except Exception:
                                     pass
-                                for _ in range(5):
+                                for _ in range(2):
                                     nc.read()
                                 if self._cv_cap:
                                     try:
