@@ -17,5 +17,6 @@
   "quota_daily_water": 0,
   "quota_per_block": 0,
   "quota_overrides": {},
-  "auto_update_enabled": false
+  "auto_update_enabled": false,
+  "passes_disabled": false
 }

@@ -257,6 +257,25 @@ class Backend(QObject):
         return getattr(self, "_pass_status", "")
 
     @Property(bool, notify=configChanged)  # type: ignore
+    def passesDisabled(self) -> bool:
+        return bool(getattr(self.cfg, "passes_disabled", False))
+
+    @Slot(bool, str, result=bool)
+    def setPassesDisabled(self, enabled: bool, password: str) -> bool:
+        try:
+            if not self.cfg.verify_password(password or ""):
+                self._set_pass_status("Wrong password — passes unchanged")
+                return False
+            self.cfg = replace_config(self.cfg, passes_disabled=bool(enabled))
+            save_config(self.cfg)
+            self.configChanged.emit()
+            self._set_pass_status("Passes " + ("disabled" if enabled else "enabled"))
+            return True
+        except Exception as e:
+            self._set_pass_status(f"Failed: {e}")
+            return False
+
+    @Property(bool, notify=configChanged)  # type: ignore
     def autoUpdateEnabled(self) -> bool:
         return bool(getattr(self.cfg, "auto_update_enabled", False))
 
@@ -1874,6 +1893,10 @@ class Backend(QObject):
     def selectStudent(self, name: str, pass_type: str, slot: str = "") -> None:
         self._resolve_block()
         self._update_roster_cache()
+        if getattr(self.cfg, "passes_disabled", False):
+            label = "Water" if pass_type == "Water" else "Bathroom"
+            self._deny_notice(name, label, "passes disabled", slot or "")
+            return
         label = "Water" if pass_type == "Water" else "Bathroom"
         pt = PassType.Water if pass_type == "Water" else PassType.Bathroom
         qc = check_quota(self.storage, self.cfg, name, label, self._block_id)
@@ -1900,6 +1923,10 @@ class Backend(QObject):
     def enqueue(self, name: str, pass_type: str, slot: str = "") -> None:
         self._resolve_block()
         self._update_roster_cache()
+        if getattr(self.cfg, "passes_disabled", False):
+            label = "Water" if pass_type == "Water" else "Bathroom"
+            self._deny_notice(name, label, "passes disabled", slot or "")
+            return
         label = "Water" if pass_type == "Water" else "Bathroom"
         pt = PassType.Water if pass_type == "Water" else PassType.Bathroom
         qc = check_quota(self.storage, self.cfg, name, label, self._block_id)

@@ -27,6 +27,7 @@ ApplicationWindow {
     property var passSlots: backend ? backend.passSlots : []
     property var queuesBySlot: backend ? backend.queuesBySlot : ({})
     property string kioskNotice: backend ? backend.kioskNotice : ""
+    property bool passesDisabled: backend ? backend.passesDisabled : false
     property string voidKey: ""
     property string approveName: ""
     property string approveSlot: ""
@@ -132,6 +133,14 @@ ApplicationWindow {
                 onClicked: { adminDialog.mode="admin"; adminDialog.open() }
             }
             Button {
+                text: passesDisabled ? "Enable Passes" : "Disable Passes"
+                font.pixelSize: 14
+                padding: 8
+                background: Rectangle { color: passesDisabled ? "#14532d" : "#991b1b"; radius: 4 }
+                contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                onClicked: { disablePass.text = ""; disableError.text = ""; disableDialog.open() }
+            }
+            Button {
                 text: "Override"
                 font.pixelSize: 14
                 padding: 8
@@ -168,6 +177,26 @@ ApplicationWindow {
                 elide: Text.ElideRight
             }
             MouseArea { anchors.fill: parent; onClicked: backend.clearNotice() }
+        }
+        Rectangle {
+            visible: passesDisabled
+            Layout.fillWidth: true
+            Layout.preferredHeight: 56
+            radius: 8
+            color: "#fef2f2"
+            border.color: "#991b1b"
+            border.width: 2
+            Label {
+                anchors.fill: parent
+                anchors.margins: 8
+                text: "PASS ISSUANCE DISABLED — tap Enable Passes to resume"
+                color: "#991b1b"
+                font.family: "Source Sans Pro"
+                font.pixelSize: 20
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
         }
         RowLayout {
             Layout.fillWidth: true
@@ -986,6 +1015,76 @@ ApplicationWindow {
                 approveError.text = "Wrong password — approval rejected"
                 approvePass.text = ""
                 approvePass.forceActiveFocus()
+            }
+        }
+    }
+
+    // Disable/enable passes dialog — password required
+    Dialog {
+        id: disableDialog
+        title: passesDisabled ? "Enable Pass Issuance" : "Disable Pass Issuance"
+        modal: true
+        anchors.centerIn: parent
+        width: 400
+        height: 260
+        standardButtons: Dialog.NoButton
+        background: Rectangle { color: "#ffffff"; radius: 8; border.color: "#991b1b"; border.width: 2 }
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 16
+            spacing: 12
+            Label {
+                text: passesDisabled ? "Re-enable pass issuance?" : "Disable all new passes?"
+                color: "#1e293b"; font.bold: true; font.pixelSize: 18
+                wrapMode: Text.WordWrap; Layout.fillWidth: true
+            }
+            Label {
+                text: passesDisabled ? "Students will be able to request passes again." : "No new passes can be issued until re-enabled."
+                color: "#475569"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true
+            }
+            TextField {
+                id: disablePass
+                echoMode: TextInput.Password
+                placeholderText: "Teacher password"
+                font.pixelSize: 18
+                Layout.fillWidth: true
+                Layout.preferredHeight: 48
+                color: "#1e293b"
+                placeholderTextColor: "#64748b"
+                background: Rectangle { color: "#ffffff"; border.color: "#d1d5db"; radius: 4 }
+                onAccepted: disableDialog.tryToggle()
+            }
+            Label { id: disableError; text: ""; color: "#991b1b"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true; visible: text !== "" }
+            RowLayout {
+                spacing: 12
+                Layout.fillWidth: true
+                Button {
+                    text: "Cancel"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 48
+                    background: Rectangle { color: "#ffffff"; radius: 4; border.color: "#d1d5db"; border.width: 1 }
+                    contentItem: Text { text: parent.text; color: "#1e293b"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                    onClicked: disableDialog.close()
+                }
+                Button {
+                    text: passesDisabled ? "Enable" : "Disable"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 48
+                    background: Rectangle { color: passesDisabled ? "#14532d" : "#991b1b"; radius: 4 }
+                    contentItem: Text { text: parent.text; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.bold: true }
+                    onClicked: disableDialog.tryToggle()
+                }
+            }
+        }
+        function tryToggle() {
+            if (backend.setPassesDisabled(!passesDisabled, disablePass.text)) {
+                disablePass.text = ""
+                disableError.text = ""
+                disableDialog.close()
+            } else {
+                disableError.text = "Wrong password — unchanged"
+                disablePass.text = ""
+                disablePass.forceActiveFocus()
             }
         }
     }

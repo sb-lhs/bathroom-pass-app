@@ -132,6 +132,7 @@ class AppConfig:
     quota_per_block: int = 0
     quota_overrides: dict[str, dict[str, int]] = field(default_factory=dict)
     auto_update_enabled: bool = False
+    passes_disabled: bool = False
 
 
     @staticmethod
@@ -274,6 +275,7 @@ def _ensure_config_exists() -> Path:
         "quota_per_block": 0,
         "quota_overrides": {},
         "auto_update_enabled": False,
+        "passes_disabled": False,
     }
     p.write_text(json.dumps(fallback, indent=2), encoding="utf-8")
     return p
@@ -305,6 +307,7 @@ def _parse_raw_config(raw: dict[str, Any]) -> AppConfig:
         quota_per_block=norm_quota_count(raw.get("quota_per_block", 0)),
         quota_overrides=norm_quota_overrides(raw.get("quota_overrides", {})),
         auto_update_enabled=bool(raw.get("auto_update_enabled", False)),
+        passes_disabled=bool(raw.get("passes_disabled", False)),
     )
 
 
